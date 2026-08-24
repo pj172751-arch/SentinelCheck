@@ -1,0 +1,26 @@
+# SentinelCheck Sample Configuration
+# This file simulates a server configuration file
+
+[server]
+hostname = sentinel-server-01
+port = 8443
+protocol = HTTPS
+max_connections = 150
+timeout_seconds = 30
+
+[logging]
+log_level = INFO
+log_directory = /var/log/sentinel
+rotate_days = 30
+
+[security]
+enable_firewall = true
+failed_login_threshold = 3
+lockout_duration_minutes = 15
+allowed_subnets = 192.168.1.0/24, 10.0.0.0/8
+
+[database]
+host = db-server-01.internal
+port = 5432
+name = sentinel_db
+ssl_mode = require

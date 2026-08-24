@@ -1,0 +1,8 @@
+user_id,username,role,email,last_login,status
+1001,admin,ADMINISTRATOR,admin@sentinel.local,2026-08-24 09:00:00,ACTIVE
+1002,jsmith,OPERATOR,jsmith@sentinel.local,2026-08-23 14:30:00,ACTIVE
+1003,agarwal,ANALYST,agarwal@sentinel.local,2026-08-24 08:45:00,ACTIVE
+1004,mwilson,OPERATOR,mwilson@sentinel.local,2026-08-20 11:00:00,INACTIVE
+1005,ckumar,ANALYST,ckumar@sentinel.local,2026-08-24 10:15:00,ACTIVE
+1006,bthomas,VIEWER,bthomas@sentinel.local,2026-08-22 16:00:00,ACTIVE
+1007,testuser,VIEWER,testuser@sentinel.local,2026-07-15 12:00:00,DISABLED

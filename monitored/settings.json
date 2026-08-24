@@ -1,0 +1,24 @@
+{
+  "application": {
+    "name": "SentinelCheck Monitoring Agent",
+    "version": "1.0.0",
+    "environment": "production"
+  },
+  "monitoring": {
+    "scan_interval_minutes": 15,
+    "hash_algorithm": "SHA-256",
+    "include_subdirectories": true,
+    "max_file_size_mb": 100
+  },
+  "alerting": {
+    "failed_login_threshold": 3,
+    "correlation_window_minutes": 10,
+    "risk_scoring_enabled": true
+  },
+  "notifications": {
+    "email_enabled": false,
+    "email_recipients": [],
+    "console_output": true,
+    "report_directory": "reports/"
+  }
+}
