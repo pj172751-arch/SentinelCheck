@@ -97,10 +97,18 @@ public class Main {
             return;
         }
 
-        // 5. Run interactive menu loop
-        Scanner scanner = new Scanner(System.in);
-        runMainMenu(scanner);
-        scanner.close();
+        // 5. Run interactive menu loop with standard input exhaustion handling
+        try {
+            Scanner scanner = new Scanner(System.in);
+            runMainMenu(scanner);
+            scanner.close();
+        } catch (java.util.NoSuchElementException e) {
+            System.out.println("\n  [INFO] Standard input exhausted. Stopping real-time services and exiting.");
+            if (fileMonitor != null && fileMonitor.isRunning()) {
+                fileMonitor.stop();
+            }
+            System.exit(0);
+        }
     }
 
     private static void checkBaselineIntegrityOnStartup() {
