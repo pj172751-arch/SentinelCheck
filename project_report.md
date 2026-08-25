@@ -1,8 +1,8 @@
-# SentinelCheck v2.0 — Stateful Host-Based Security Event Monitor Project Report
+﻿# SentinelCheck v2.0 â€” Stateful Host-Based Security Event Monitor Project Report
 
 ---
 
-# 🎓 Cover Page
+# ðŸŽ“ Cover Page
 
 ## LJ POLYTECHNIC
 ### DEPARTMENT OF COMPUTER ENGINEERING
@@ -31,7 +31,7 @@
 
 ---
 
-## 📜 Table of Contents
+## ðŸ“œ Table of Contents
 1. **Abstract / Executive Summary**
 2. **Introduction & Theoretical Background**
    - HIDS vs. NIDS
@@ -50,10 +50,10 @@
    - `data/incidents.csv` Schema
 6. **Detailed CLI Submenu Walkthrough & Screenshots**
    - Main Menu & System Status
-   - Monitoring Submenu (Options 1–6)
-   - Security Analysis Submenu (Options 1–5)
-   - Incident Management Submenu (Options 1–7)
-   - Configuration Submenu (Options 1–4)
+   - Monitoring Submenu (Options 1â€“6)
+   - Security Analysis Submenu (Options 1â€“5)
+   - Incident Management Submenu (Options 1â€“7)
+   - Configuration Submenu (Options 1â€“4)
 7. **Core Source Code Implementations**
    - Directory Watcher (`FileMonitor.java`)
    - Detection Engine (`DetectionEngine.java`)
@@ -164,7 +164,7 @@ timestamp,EVENT_TYPE,username,source_ip,dest_ip,filePath,expectedHash,actualHash
 2026-08-25T10:12:00,FAILED_LOGIN,user1,10.0.0.160,,,,,,User: user1,LOCAL
 ```
 
-#### Code — SecurityEvent CSV Serialization (`SecurityEvent.java`)
+#### Code â€” SecurityEvent CSV Serialization (`SecurityEvent.java`)
 ```java
     /**
      * Serializes this security event to a CSV line.
@@ -186,7 +186,7 @@ timestamp,EVENT_TYPE,username,source_ip,dest_ip,filePath,expectedHash,actualHash
     }
 ```
 
-#### Code — SecurityEvent CSV Parsing (`SecurityEvent.java`)
+#### Code â€” SecurityEvent CSV Parsing (`SecurityEvent.java`)
 ```java
     /**
      * Parses a SecurityEvent from a CSV line.
@@ -213,7 +213,7 @@ timestamp,EVENT_TYPE,username,source_ip,dest_ip,filePath,expectedHash,actualHash
     }
 ```
 
-#### Code — Event History Loading & Persistence (`EventHistory.java`)
+#### Code â€” Event History Loading & Persistence (`EventHistory.java`)
 ```java
     public synchronized void addEvent(SecurityEvent event) {
         if (events.contains(event)) {
@@ -267,7 +267,7 @@ incidentId,sourceContext,severity,riskScore,status,firstSeen,lastSeen,alertIds,a
 INC-20260825-0001,10.0.0.150,CRITICAL,120,CLOSED,2026-08-25T10:02,2026-08-25T10:04,AUTH-001_10_0_0_150_20260825_100200_4762;AUTH-003_10_0_0_150_20260825_100200_2788;FW-001_10_0_0_150_20260825_100400_1773,2026-08-25 17:22:20 - Incident created;2026-08-25 17:22:20 - Alert attached: AUTH-001 (Brute Force Attempt);2026-08-25 17:22:20 - Alert attached: AUTH-003 (Multiple Account Targeting);2026-08-25 17:22:21 - Alert attached: FW-001 (Port Probing Pattern);2026-08-25 17:23:06 - Status changed from OPEN to ACKNOWLEDGED;2026-08-25 17:23:06 - Status changed from ACKNOWLEDGED to CLOSED
 ```
 
-#### Code — Incident CSV Serialization (`Incident.java`)
+#### Code â€” Incident CSV Serialization (`Incident.java`)
 ```java
     /**
      * Serializes this incident to a CSV line.
@@ -295,7 +295,7 @@ INC-20260825-0001,10.0.0.150,CRITICAL,120,CLOSED,2026-08-25T10:02,2026-08-25T10:
     }
 ```
 
-#### Code — Incidents Loading & Saving (`IncidentManager.java`)
+#### Code â€” Incidents Loading & Saving (`IncidentManager.java`)
 ```java
     /**
      * Persists all stateful incidents to data/incidents.csv.
@@ -393,151 +393,151 @@ INC-20260825-0001,10.0.0.150,CRITICAL,120,CLOSED,2026-08-25T10:02,2026-08-25T10:
 ### A. Main Dashboard View
 Shows the current monitoring status, system severity, and total active incidents.
 
-![Main Dashboard](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot1_main_menu.png)
+![Main Dashboard](screenshots/screenshot1_main_menu.png)
 
 ---
 
 ### B. System Status Dashboard (`Option 5`)
 Aggregates parameters from the central manager nodes, displaying file counts, events, and maintenance mode status.
 
-![System Status](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot2_system_status.png)
+![System Status](screenshots/screenshot2_system_status.png)
 
 ---
 
 ### C. Monitoring Submenu (`Option 1`)
 Provides options for starting watchers, manual verification, and updating trusted file baselines.
 
-![Monitoring Submenu](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot3_submenu_monitoring.png)
+![Monitoring Submenu](screenshots/screenshot3_submenu_monitoring.png)
 
 #### [Option 1.1] Start Real-Time Monitoring:
 Initializes the file watcher thread on the protected directory.
 
-![Start Monitoring](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot4_monitor_start.png)
+![Start Monitoring](screenshots/screenshot4_monitor_start.png)
 
 #### [Option 1.2] Stop Monitoring:
 Stops the background file watcher thread.
 
-![Stop Monitoring](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot5_monitor_stop.png)
+![Stop Monitoring](screenshots/screenshot5_monitor_stop.png)
 
 #### [Option 1.4] View Protected Files:
 Lists the filenames and expected SHA-256 hashes loaded from the baseline.
 
-![View Protected Files](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot6_monitor_view.png)
+![View Protected Files](screenshots/screenshot6_monitor_view.png)
 
 #### [Option 1.3] Verify File Integrity:
 Runs a manual scan to check current hashes against the baseline.
 
-![Verify Integrity](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot7_monitor_verify.png)
+![Verify Integrity](screenshots/screenshot7_monitor_verify.png)
 
 #### [Option 1.5] Create / Update Baseline:
 Generates a new baseline file and updates its sibling `.sha256` checksum.
 
-![Create Baseline](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot8_monitor_baseline.png)
+![Create Baseline](screenshots/screenshot8_monitor_baseline.png)
 
 ---
 
 ### D. Security Log Analysis Submenu (`Option 2`)
 Provides tools to parse log files, view statistics, and review security events.
 
-![Log Analysis Submenu](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot9_submenu_analysis.png)
+![Log Analysis Submenu](screenshots/screenshot9_submenu_analysis.png)
 
 #### [Option 2.5] View Detection Statistics:
 Displays event counts grouped by event type.
 
-![View Stats](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot10_analysis_stats.png)
+![View Stats](screenshots/screenshot10_analysis_stats.png)
 
 #### [Option 2.1] Analyze Authentication Logs:
 Parses the authentication log file to check for failed attempts.
 
-![Analyze Auth Logs](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot11_analysis_auth.png)
+![Analyze Auth Logs](screenshots/screenshot11_analysis_auth.png)
 
 #### [Option 2.2] Analyze Firewall Logs:
 Parses the firewall log file to check for dropped packets and port probes.
 
-![Analyze Firewall Logs](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot12_analysis_firewall.png)
+![Analyze Firewall Logs](screenshots/screenshot12_analysis_firewall.png)
 
 #### [Option 2.3] Run Complete Security Scan:
 Scans the directory and log files, evaluates rules, and generates a stateful report.
 
-![Complete Scan Part 1](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot13_analysis_scan_part1.png)
-![Complete Scan Part 2](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot13_analysis_scan_part2.png)
-![Complete Scan Part 3](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot13_analysis_scan_part3.png)
+![Complete Scan Part 1](screenshots/screenshot13_analysis_scan_part1.png)
+![Complete Scan Part 2](screenshots/screenshot13_analysis_scan_part2.png)
+![Complete Scan Part 3](screenshots/screenshot13_analysis_scan_part3.png)
 
 #### [Option 2.4] View Security Events Log:
 Displays a reverse-chronological timeline of normalized events.
 
-![Events Log Timeline](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot14_analysis_logs.png)
+![Events Log Timeline](screenshots/screenshot14_analysis_logs.png)
 
 ---
 
 ### E. Incident Lifecycle Submenu (`Option 3`)
 Enables operators to manage active security tickets and view audit trails.
 
-![Incident Management Submenu](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot15_submenu_incidents.png)
+![Incident Management Submenu](screenshots/screenshot15_submenu_incidents.png)
 
 #### [Option 3.1] View Open/Acknowledged Incidents:
 Lists active incidents requiring attention.
 
-![View Open Incidents](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot16_incident_view_open.png)
+![View Open Incidents](screenshots/screenshot16_incident_view_open.png)
 
 #### [Option 3.2] View All Incidents:
 Lists all historical incidents, including closed tickets.
 
-![View All Incidents](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot17_incident_view_all.png)
+![View All Incidents](screenshots/screenshot17_incident_view_all.png)
 
 #### [Option 3.3] View Incident Details & Rules:
 Displays contributing alerts and the operator audit trail.
 
-![Incident Details](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot8_incident_details.png)
+![Incident Details](screenshots/screenshot8_incident_details.png)
 
 #### [Option 3.4] View Event Timeline for Incident:
 Displays a chronological timeline of events contributing to the selected incident.
 
-![Incident Timeline](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot19_incident_timeline.png)
+![Incident Timeline](screenshots/screenshot19_incident_timeline.png)
 
 #### [Option 3.5] Acknowledge Incident:
 Updates the incident status to `ACKNOWLEDGED`.
 
-![Acknowledge Incident](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot20_incident_acknowledge.png)
+![Acknowledge Incident](screenshots/screenshot20_incident_acknowledge.png)
 
 #### [Option 3.6] Close Incident:
 Updates the incident status to `CLOSED`.
 
-![Close Incident](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot21_incident_close.png)
+![Close Incident](screenshots/screenshot21_incident_close.png)
 
 #### [Option 3.7] Generate Incident Report File:
 Compiles all incidents, timelines, and audit trails into a plain-text report.
 
-![Generate Report File Part 1](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot22_incident_report_part1.png)
-![Generate Report File Part 2](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot22_incident_report_part2.png)
-![Generate Report File Part 3](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot22_incident_report_part3.png)
+![Generate Report File Part 1](screenshots/screenshot22_incident_report_part1.png)
+![Generate Report File Part 2](screenshots/screenshot22_incident_report_part2.png)
+![Generate Report File Part 3](screenshots/screenshot22_incident_report_part3.png)
 
 ---
 
 ### F. Configuration Submenu (`Option 4`)
 Allows modification of system parameters, directory paths, and maintenance settings.
 
-![Configuration Submenu](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot23_submenu_config.png)
+![Configuration Submenu](screenshots/screenshot23_submenu_config.png)
 
 #### [Option 4.1] Monitored Protected Directory:
 Changes the directory path monitored by the file watcher.
 
-![Configure Monitored Directory](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot24_config_dir.png)
+![Configure Monitored Directory](screenshots/screenshot24_config_dir.png)
 
 #### [Option 4.2] Adjust Detection Rule Thresholds:
 Modifies the values used by the rule engine (e.g., brute force limits).
 
-![Configure Thresholds](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot25_config_thresholds.png)
+![Configure Thresholds](screenshots/screenshot25_config_thresholds.png)
 
 #### [Option 4.3] Maintenance Mode:
 Toggles maintenance mode to suppress security alerts during planned updates.
 
-![Configure Maintenance Mode](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot26_config_maintenance.png)
+![Configure Maintenance Mode](screenshots/screenshot26_config_maintenance.png)
 
 #### [Option 4.4] Baseline Checksum Health:
 Verifies the existence and integrity of the baseline file and its checksum.
 
-![Verify Baseline Checksum Health](C:/Users/Pooja/.gemini/antigravity-ide/brain/928f30d1-5f26-4481-aac8-61164f812138/screenshot27_config_baseline_health.png)
+![Verify Baseline Checksum Health](screenshots/screenshot27_config_baseline_health.png)
 
 ---
 
@@ -611,3 +611,4 @@ SentinelCheck v2.0 successfully implements a Host-Based Intrusion Detection Syst
 1. **Dynamic DB Integration**: Replace CSV files with a lightweight relational database (e.g., SQLite or H2).
 2. **Agent-Server Architecture**: Split the application into an agent that forwards events and a central server that runs the rule engine and dashboard.
 3. **Automated Remediations**: Add triggers to block offending source IPs using system firewall commands when critical incidents are detected.
+
