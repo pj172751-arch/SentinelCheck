@@ -32,10 +32,10 @@ public class EventHistory {
         }
     }
 
-    /**
-     * Appends a new event to the in-memory list and persists it to data/events.csv.
-     */
     public synchronized void addEvent(SecurityEvent event) {
+        if (events.contains(event)) {
+            return; // Skip duplicate events to prevent redundant logs
+        }
         events.add(event);
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(EVENTS_FILE, true))) {
             writer.write(event.toCSVLine());

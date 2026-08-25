@@ -71,7 +71,7 @@ public class LogParser {
                     String details = "User: " + username;
 
                     events.add(new SecurityEvent(
-                            timestamp, eventType, sourceIP, details));
+                            timestamp, eventType, sourceIP, username, details));
 
                 } catch (DateTimeParseException e) {
                     System.err.println("[WARN] Invalid timestamp at line "
