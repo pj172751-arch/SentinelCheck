@@ -153,10 +153,10 @@ The rule engine evaluates events using the following risk weights:
 
 ## 5. Database & Storage Schemas
 
-To maintain zero dependencies and portability, SentinelCheck uses flat-file CSV databases.
+To maintain portability and zero external library dependencies, SentinelCheck implements local storage using flat-file CSV databases. The data is partitioned, parsed, and persisted using native Java file I/O classes.
 
 ### A. Events Database (`data/events.csv`)
-Logs every security event parsed from system logs or captured in real-time by the file watcher.
+Logs every security event parsed from log sources or captured in real-time by the file watcher.
 ```text
 timestamp,EVENT_TYPE,username,source_ip,dest_ip,filePath,expectedHash,actualHash,port,protocol,details,authContext
 2026-08-25T10:14:00,FIREWALL_DROP,,10.0.0.170,192.168.1.1,,,22,TCP,Port 22/TCP,LOCAL
@@ -164,11 +164,226 @@ timestamp,EVENT_TYPE,username,source_ip,dest_ip,filePath,expectedHash,actualHash
 2026-08-25T10:12:00,FAILED_LOGIN,user1,10.0.0.160,,,,,,User: user1,LOCAL
 ```
 
+#### Code — SecurityEvent CSV Serialization (`SecurityEvent.java`)
+```java
+    /**
+     * Serializes this security event to a CSV line.
+     */
+    public String toCSVLine() {
+        return String.join("|",
+                timestamp.toString(),
+                eventType.name(),
+                sourceIP,
+                destinationIP,
+                username,
+                filePath,
+                fileHash,
+                String.valueOf(port),
+                protocol,
+                details,
+                authorizationContext
+        );
+    }
+```
+
+#### Code — SecurityEvent CSV Parsing (`SecurityEvent.java`)
+```java
+    /**
+     * Parses a SecurityEvent from a CSV line.
+     */
+    public static SecurityEvent fromCSVLine(String line) {
+        String[] parts = line.split("\\|", -1);
+        if (parts.length < 11) {
+            throw new IllegalArgumentException("Malformed security event line: " + line);
+        }
+        LocalDateTime timestamp = LocalDateTime.parse(parts[0]);
+        EventType eventType = EventType.valueOf(parts[1]);
+        String sourceIP = parts[2];
+        String destinationIP = parts[3];
+        String username = parts[4];
+        String filePath = parts[5];
+        String fileHash = parts[6];
+        int port = Integer.parseInt(parts[7]);
+        String protocol = parts[8];
+        String details = parts[9];
+        String authorizationContext = parts[10];
+
+        return new SecurityEvent(timestamp, eventType, sourceIP, destinationIP, username, filePath, fileHash,
+                port, protocol, details, authorizationContext);
+    }
+```
+
+#### Code — Event History Loading & Persistence (`EventHistory.java`)
+```java
+    public synchronized void addEvent(SecurityEvent event) {
+        if (events.contains(event)) {
+            return; // Skip duplicate events to prevent redundant logs
+        }
+        events.add(event);
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(EVENTS_FILE, true))) {
+            writer.write(event.toCSVLine());
+            writer.newLine();
+        } catch (IOException e) {
+            System.err.println("  [ERROR] Failed to persist event: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Loads all historical events from data/events.csv.
+     */
+    public synchronized void loadEvents() {
+        events.clear();
+        File file = new File(EVENTS_FILE);
+        if (!file.exists()) {
+            return;
+        }
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty()) {
+                    continue;
+                }
+                try {
+                    SecurityEvent event = SecurityEvent.fromCSVLine(line);
+                    events.add(event);
+                } catch (Exception e) {
+                    System.err.println("  [WARN] Skipping malformed history event: " + e.getMessage());
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("  [ERROR] Failed to load event history: " + e.getMessage());
+        }
+    }
+```
+
+---
+
 ### B. Incidents Database (`data/incidents.csv`)
 Tracks the state, risk score, severity, timeline, and audit logs of all active security tickets.
 ```text
 incidentId,sourceContext,severity,riskScore,status,firstSeen,lastSeen,alertIds,auditTrail
 INC-20260825-0001,10.0.0.150,CRITICAL,120,CLOSED,2026-08-25T10:02,2026-08-25T10:04,AUTH-001_10_0_0_150_20260825_100200_4762;AUTH-003_10_0_0_150_20260825_100200_2788;FW-001_10_0_0_150_20260825_100400_1773,2026-08-25 17:22:20 - Incident created;2026-08-25 17:22:20 - Alert attached: AUTH-001 (Brute Force Attempt);2026-08-25 17:22:20 - Alert attached: AUTH-003 (Multiple Account Targeting);2026-08-25 17:22:21 - Alert attached: FW-001 (Port Probing Pattern);2026-08-25 17:23:06 - Status changed from OPEN to ACKNOWLEDGED;2026-08-25 17:23:06 - Status changed from ACKNOWLEDGED to CLOSED
+```
+
+#### Code — Incident CSV Serialization (`Incident.java`)
+```java
+    /**
+     * Serializes this incident to a CSV line.
+     * Format: id|sourceIP|severity|riskScore|status|firstSeen|lastSeen|alertIds|auditTrail
+     */
+    public String toCSVLine() {
+        List<String> alertIds = new ArrayList<>();
+        for (Alert a : alerts) {
+            alertIds.add(a.getAlertId());
+        }
+        String alertIdsStr = String.join(",", alertIds);
+        String auditTrailStr = String.join(";", auditTrail);
+
+        return String.join("|", 
+            id, 
+            sourceIP, 
+            severity.name(), 
+            String.valueOf(riskScore), 
+            status.name(), 
+            firstSeen.toString(), 
+            lastSeen.toString(), 
+            alertIdsStr, 
+            auditTrailStr
+        );
+    }
+```
+
+#### Code — Incidents Loading & Saving (`IncidentManager.java`)
+```java
+    /**
+     * Persists all stateful incidents to data/incidents.csv.
+     */
+    public synchronized void saveIncidents() {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(INCIDENTS_FILE))) {
+            for (Incident inc : incidents) {
+                writer.write(inc.toCSVLine());
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            System.err.println("  [ERROR] Failed to save incidents: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Loads stateful incidents and binds them back to the list of regenerated Alerts.
+     */
+    public synchronized void loadIncidents(List<Alert> allAlerts) {
+        incidents.clear();
+        File file = new File(INCIDENTS_FILE);
+        if (!file.exists()) {
+            return;
+        }
+
+        int maxCounter = 0;
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty()) {
+                    continue;
+                }
+
+                try {
+                    String[] parts = line.split("\\|", -1);
+                    String id = parts[0];
+                    String sourceIP = parts[1];
+                    Severity severity = Severity.valueOf(parts[2]);
+                    int riskScore = Integer.parseInt(parts[3]);
+                    IncidentStatus status = IncidentStatus.valueOf(parts[4]);
+                    LocalDateTime firstSeen = LocalDateTime.parse(parts[5]);
+                    LocalDateTime lastSeen = LocalDateTime.parse(parts[6]);
+                    String alertIdsStr = parts[7];
+                    String auditTrailStr = parts[8];
+
+                    // Track highest counter to avoid ID overlap
+                    String[] idParts = id.split("-");
+                    if (idParts.length == 3) {
+                        int serial = Integer.parseInt(idParts[2]);
+                        if (serial > maxCounter) {
+                            maxCounter = serial;
+                        }
+                    }
+
+                    Incident incident = new Incident(id, sourceIP, severity, riskScore, status, firstSeen, lastSeen);
+                    
+                    // Re-bind alerts
+                    if (!alertIdsStr.isEmpty()) {
+                        String[] alertIds = alertIdsStr.split(",");
+                        for (String aid : alertIds) {
+                            Alert matchedAlert = findAlertById(aid, allAlerts);
+                            if (matchedAlert != null) {
+                                incident.addAlert(matchedAlert);
+                            }
+                        }
+                    }
+
+                    // Re-bind audit trail
+                    incident.getAuditTrail().clear();
+                    if (!auditTrailStr.isEmpty()) {
+                        String[] auditLogs = auditTrailStr.split(";");
+                        for (String auditLog : auditLogs) {
+                            incident.loadAuditLogEntry(auditLog);
+                        }
+                    }
+
+                    incidents.add(incident);
+
+                } catch (Exception e) {
+                    System.err.println("  [WARN] Skipping malformed incident entry: " + e.getMessage());
+                }
+            }
+            this.incidentCounter = maxCounter + 1;
+        } catch (IOException e) {
+            System.err.println("  [ERROR] Failed to load incidents: " + e.getMessage());
+        }
+    }
 ```
 
 ---
