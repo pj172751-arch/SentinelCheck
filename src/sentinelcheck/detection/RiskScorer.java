@@ -2,84 +2,109 @@ package sentinelcheck.detection;
 
 import sentinelcheck.model.Severity;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
- * Transparent, rule-based risk scoring engine.
- *
- * Assigns numeric scores to individual events, then maps
- * the cumulative total to a severity level.
- *
- * Score table:
- *   Failed login (each)           +10
- *   3+ failed logins (per IP)     +30
- *   Firewall DROP (each)          +15
- *   Critical file modified        +40
- *   New file detected             +20
- *   Missing file                  +30
- *
- * Severity thresholds:
- *   0–29   LOW
- *   30–59  MEDIUM
- *   60–89  HIGH
- *   90+    CRITICAL
- *
- * No machine learning — fully explainable for a diploma project.
+ * Centralized, explainable risk scoring engine for SentinelCheck.
+ * Assigns numeric weights to rules and maps cumulative scores to severity tiers.
  */
 public class RiskScorer {
 
-    // ─── Individual event scores ─────────────────────────────────
+    // Thresholds
+    private int thresholdMedium = 30;
+    private int thresholdHigh = 60;
+    private int thresholdCritical = 100;
 
-    public static final int SCORE_FAILED_LOGIN       = 10;
-    public static final int SCORE_BRUTE_FORCE_BONUS  = 30;
-    public static final int SCORE_FIREWALL_DROP      = 15;
-    public static final int SCORE_FILE_MODIFIED      = 40;
-    public static final int SCORE_FILE_NEW           = 20;
-    public static final int SCORE_FILE_MISSING       = 30;
+    // Centralized rule weights
+    private final Map<String, Integer> ruleScores;
 
-    // ─── Severity thresholds ─────────────────────────────────────
+    public RiskScorer() {
+        ruleScores = new HashMap<>();
+        resetDefaults();
+    }
 
-    private static final int THRESHOLD_MEDIUM   = 30;
-    private static final int THRESHOLD_HIGH     = 60;
-    private static final int THRESHOLD_CRITICAL = 90;
+    public void resetDefaults() {
+        ruleScores.put("FILE-001", 40);  // File Modified
+        ruleScores.put("FILE-002", 30);  // File Missing
+        ruleScores.put("FILE-003", 20);  // File New
+        ruleScores.put("FILE-004", 100); // Baseline Tampered
+        
+        ruleScores.put("AUTH-001", 30);  // Brute Force
+        ruleScores.put("AUTH-002", 50);  // Suspicious Success
+        ruleScores.put("AUTH-003", 40);  // Multiple Account Targeting
+        
+        ruleScores.put("FW-001", 30);   // Port Probing
+        ruleScores.put("CORR-001", 20);  // Correlation Bonus
+    }
+
+    /**
+     * Looks up the score for a specific rule ID.
+     */
+    public int scoreRule(String ruleId) {
+        return ruleScores.getOrDefault(ruleId, 10); // default to 10 points if unknown
+    }
+
+    public void setRuleScore(String ruleId, int score) {
+        ruleScores.put(ruleId, score);
+    }
+
+    public Map<String, Integer> getRuleScores() {
+        return new HashMap<>(ruleScores);
+    }
+
+    /**
+     * Legacy mappings for compatibility with SentinelCheck 1.0.
+     */
+    public int scoreAuthAlert(int failedCount) {
+        int score = failedCount * 10;
+        if (failedCount >= 3) {
+            score += 30;
+        }
+        return score;
+    }
+
+    public int scoreFirewallAlert(int dropCount) {
+        return dropCount * 15;
+    }
 
     /**
      * Maps a cumulative risk score to a Severity level.
-     *
-     * @param totalScore the sum of all individual event scores
-     * @return the corresponding Severity
      */
     public Severity calculateSeverity(int totalScore) {
-        if (totalScore >= THRESHOLD_CRITICAL) {
+        if (totalScore >= thresholdCritical) {
             return Severity.CRITICAL;
-        } else if (totalScore >= THRESHOLD_HIGH) {
+        } else if (totalScore >= thresholdHigh) {
             return Severity.HIGH;
-        } else if (totalScore >= THRESHOLD_MEDIUM) {
+        } else if (totalScore >= thresholdMedium) {
             return Severity.MEDIUM;
         } else {
             return Severity.LOW;
         }
     }
 
-    /**
-     * Returns the risk score for failed login alerts.
-     *
-     * @param failedCount number of failed attempts from one IP
-     * @return the total score for this authentication alert
-     */
-    public int scoreAuthAlert(int failedCount) {
-        int score = failedCount * SCORE_FAILED_LOGIN;
-        if (failedCount >= 3) {
-            score += SCORE_BRUTE_FORCE_BONUS;
-        }
-        return score;
+    // Configurable thresholds getters and setters
+    public int getThresholdMedium() {
+        return thresholdMedium;
     }
 
-    /**
-     * Returns the risk score for firewall DROP alerts.
-     *
-     * @param dropCount number of DROP events from one IP
-     * @return the total score for this firewall alert
-     */
-    public int scoreFirewallAlert(int dropCount) {
-        return dropCount * SCORE_FIREWALL_DROP;
+    public void setThresholdMedium(int thresholdMedium) {
+        this.thresholdMedium = thresholdMedium;
+    }
+
+    public int getThresholdHigh() {
+        return thresholdHigh;
+    }
+
+    public void setThresholdHigh(int thresholdHigh) {
+        this.thresholdHigh = thresholdHigh;
+    }
+
+    public int getThresholdCritical() {
+        return thresholdCritical;
+    }
+
+    public void setThresholdCritical(int thresholdCritical) {
+        this.thresholdCritical = thresholdCritical;
     }
 }

@@ -1,10 +1,8 @@
 package sentinelcheck.report;
 
-import sentinelcheck.logs.AuthenticationMonitor;
-import sentinelcheck.logs.FirewallMonitor;
 import sentinelcheck.model.Alert;
-import sentinelcheck.model.FileRecord;
-import sentinelcheck.model.FileStatus;
+import sentinelcheck.model.Incident;
+import sentinelcheck.model.SecurityEvent;
 import sentinelcheck.model.Severity;
 
 import java.io.BufferedWriter;
@@ -13,18 +11,12 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Generates the plain-text SentinelCheck Incident Report.
- *
- * Report sections:
- *   1. Header with scan timestamp
- *   2. File Integrity Events
- *   3. Authentication Events
- *   4. Firewall Events
- *   5. Correlated Incidents
- *   6. Summary with counts and overall risk level
+ * Generates the plain-text SentinelCheck Incident Report detailing stateful incidents,
+ * timelines, audit logs, and event histories.
  */
 public class IncidentReportGenerator {
 
@@ -32,205 +24,115 @@ public class IncidentReportGenerator {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private static final String SEPARATOR =
-            "==================================================";
+            "==============================================================";
     private static final String SECTION_LINE =
-            "--------------------------------------------------";
+            "--------------------------------------------------------------";
 
     /**
-     * Generates the full incident report and writes it to a file.
-     *
-     * @param fileRecords        integrity check results (may be null)
-     * @param authResults        authentication analysis results (may be null)
-     * @param firewallResults    firewall analysis results (may be null)
-     * @param alerts             all generated alerts (may be null)
-     * @param correlatedAlerts   correlated incident alerts (may be null)
-     * @param overallRisk        the overall risk severity
-     * @param reportFile         where to write the report
-     * @throws IOException if the report cannot be written
+     * Generates a stateful security monitoring report.
      */
-    public void generateReport(List<FileRecord> fileRecords,
-                                List<AuthenticationMonitor.AuthResult> authResults,
-                                List<FirewallMonitor.FirewallResult> firewallResults,
-                                List<Alert> alerts,
-                                List<Alert> correlatedAlerts,
-                                Severity overallRisk,
-                                File reportFile) throws IOException {
+    public void generateStatefulReport(List<Incident> incidents, List<SecurityEvent> events, 
+                                       List<String> maintenanceAudit, File reportFile) throws IOException {
 
-        // Ensure the reports directory exists
+        // Ensure directories exist
         File parentDir = reportFile.getParentFile();
         if (parentDir != null && !parentDir.exists()) {
             parentDir.mkdirs();
         }
 
-        StringBuilder report = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
 
         // ─── Header ──────────────────────────────────────────────
-        report.append(SEPARATOR).append("\n");
-        report.append("              SENTINELCHECK\n");
-        report.append("           SECURITY INCIDENT REPORT\n");
-        report.append(SEPARATOR).append("\n\n");
-        report.append("Scan Time: ").append(LocalDateTime.now().format(TIMESTAMP_FORMAT));
-        report.append("\n\n");
+        sb.append(SEPARATOR).append("\n");
+        sb.append("                       SENTINELCHECK\n");
+        sb.append("                 STATEFUL INCIDENT REPORT\n");
+        sb.append(SEPARATOR).append("\n\n");
+        sb.append("Generated At : ").append(LocalDateTime.now().format(TIMESTAMP_FORMAT)).append("\n");
+        sb.append("Total Events : ").append(events.size()).append("\n");
+        sb.append("Incidents    : ").append(incidents.size()).append("\n\n");
 
-        // ─── File Integrity Events ───────────────────────────────
-        report.append("FILE INTEGRITY EVENTS\n");
-        report.append(SECTION_LINE).append("\n");
-
-        if (fileRecords != null && !fileRecords.isEmpty()) {
-            int modifiedCount = 0, missingCount = 0, newCount = 0, unchangedCount = 0;
-
-            for (FileRecord record : fileRecords) {
-                switch (record.getStatus()) {
-                    case MODIFIED:
-                        modifiedCount++;
-                        report.append("[MODIFIED]\n");
-                        report.append("  File: ").append(record.getFilePath()).append("\n");
-                        report.append("  Old SHA-256: ").append(record.getOldHash()).append("\n");
-                        report.append("  New SHA-256: ").append(record.getNewHash()).append("\n\n");
-                        break;
-                    case NEW:
-                        newCount++;
-                        report.append("[NEW]\n");
-                        report.append("  File: ").append(record.getFilePath()).append("\n");
-                        report.append("  SHA-256: ").append(record.getNewHash()).append("\n\n");
-                        break;
-                    case MISSING:
-                        missingCount++;
-                        report.append("[MISSING]\n");
-                        report.append("  File: ").append(record.getFilePath()).append("\n");
-                        report.append("  Last known SHA-256: ").append(record.getOldHash()).append("\n\n");
-                        break;
-                    case UNCHANGED:
-                        unchangedCount++;
-                        break;
+        // ─── Active/Open Incidents ───────────────────────────────
+        sb.append("INCIDENTS SUMMARY\n");
+        sb.append(SECTION_LINE).append("\n");
+        if (incidents.isEmpty()) {
+            sb.append("  No security incidents recorded.\n\n");
+        } else {
+            for (Incident inc : incidents) {
+                sb.append(String.format("ID         : %s\n", inc.getId()));
+                sb.append(String.format("Status     : %s\n", inc.getStatus()));
+                sb.append(String.format("Severity   : %s (Score: %d)\n", inc.getSeverity(), inc.getRiskScore()));
+                sb.append(String.format("Source     : %s\n", inc.getSourceIP()));
+                sb.append(String.format("First Seen : %s\n", inc.getFirstSeen().format(TIMESTAMP_FORMAT)));
+                sb.append(String.format("Last Seen  : %s\n", inc.getLastSeen().format(TIMESTAMP_FORMAT)));
+                
+                sb.append("\n  TRIGGERED RULES:\n");
+                for (Alert alert : inc.getAlerts()) {
+                    sb.append(String.format("    - [%s] %s: %s (Points: +%d)\n", 
+                            alert.getRuleId(), alert.getRuleName(), alert.getDescription(), alert.getRiskScore()));
                 }
-            }
 
-            if (modifiedCount == 0 && missingCount == 0 && newCount == 0) {
-                report.append("  All ").append(unchangedCount)
-                        .append(" files passed integrity check.\n\n");
-            }
-        } else {
-            report.append("  No file integrity scan was performed.\n\n");
-        }
-
-        // ─── Authentication Events ───────────────────────────────
-        report.append("AUTHENTICATION EVENTS\n");
-        report.append(SECTION_LINE).append("\n");
-
-        if (authResults != null && !authResults.isEmpty()) {
-            boolean hasAlerts = false;
-            for (AuthenticationMonitor.AuthResult result : authResults) {
-                if (result.isAlert()) {
-                    hasAlerts = true;
-                    report.append("[ALERT]\n");
-                    report.append("  IP: ").append(result.getIpAddress()).append("\n");
-                    report.append("  Failed Login Attempts: ")
-                            .append(result.getFailedAttempts()).append("\n");
-                    report.append("  Severity: ").append(result.getSeverity()).append("\n\n");
+                sb.append("\n  AUDIT TRAIL:\n");
+                for (String log : inc.getAuditTrail()) {
+                    sb.append(String.format("    %s\n", log));
                 }
+                sb.append("\n").append(SECTION_LINE).append("\n");
             }
+        }
+        sb.append("\n");
 
-            if (!hasAlerts) {
-                report.append("  No authentication alerts triggered.\n\n");
-            }
-
-            // Also show the full IP table
-            report.append("  IP Summary Table:\n");
-            report.append("  ").append(String.format("%-18s  %-16s  %s\n",
-                    "IP", "Failed Attempts", "Status"));
-            report.append("  ").append(String.format("%-18s  %-16s  %s\n",
-                    "──────────────────", "────────────────", "──────────"));
-            for (AuthenticationMonitor.AuthResult result : authResults) {
-                String status = result.isAlert()
-                        ? "⚠ " + result.getSeverity()
-                        : "Normal";
-                report.append("  ").append(String.format("%-18s  %-16d  %s\n",
-                        result.getIpAddress(), result.getFailedAttempts(), status));
-            }
-            report.append("\n");
+        // ─── Maintenance Activity ───────────────────────────────
+        sb.append("AUTHORIZED MAINTENANCE EVENTS\n");
+        sb.append(SECTION_LINE).append("\n");
+        if (maintenanceAudit.isEmpty()) {
+            sb.append("  No maintenance activities logged.\n\n");
         } else {
-            report.append("  No authentication log was analyzed.\n\n");
+            for (String log : maintenanceAudit) {
+                sb.append("  ").append(log).append("\n");
+            }
+            sb.append("\n");
         }
 
-        // ─── Firewall Events ─────────────────────────────────────
-        report.append("FIREWALL EVENTS\n");
-        report.append(SECTION_LINE).append("\n");
-
-        if (firewallResults != null && !firewallResults.isEmpty()) {
-            for (FirewallMonitor.FirewallResult result : firewallResults) {
-                report.append("[DROP]\n");
-                report.append("  Source IP: ").append(result.getSourceIP()).append("\n");
-                report.append("  DROP Count: ").append(result.getDropCount()).append("\n");
-                report.append("  Targeted Ports: ")
-                        .append(String.join(", ", result.getTargetedPorts())).append("\n");
-                report.append("  Severity: ").append(result.getSeverity()).append("\n\n");
-            }
+        // ─── Timeline of Events ──────────────────────────────────
+        sb.append("RAW EVENT HISTORY LOG (LATEST FIRST)\n");
+        sb.append(SECTION_LINE).append("\n");
+        if (events.isEmpty()) {
+            sb.append("  No raw events recorded in history.\n\n");
         } else {
-            report.append("  No firewall log was analyzed.\n\n");
-        }
-
-        // ─── Correlated Incidents ────────────────────────────────
-        report.append("CORRELATED INCIDENTS\n");
-        report.append(SECTION_LINE).append("\n");
-
-        if (correlatedAlerts != null && !correlatedAlerts.isEmpty()) {
-            for (Alert correlated : correlatedAlerts) {
-                report.append("[").append(correlated.getSeverity()).append("]\n");
-                report.append("  Source: ").append(correlated.getSourceIP()).append("\n");
-                report.append("  Combined Risk Score: ")
-                        .append(correlated.getRiskScore()).append("\n");
-                report.append("  ").append(correlated.getDescription()
-                        .replace("\n", "\n  ")).append("\n\n");
+            List<SecurityEvent> sortedEvents = new ArrayList<>(events);
+            sortedEvents.sort((a, b) -> b.getTimestamp().compareTo(a.getTimestamp())); // latest first
+            
+            for (SecurityEvent e : sortedEvents) {
+                sb.append(String.format("  [%s] %-15s | Source: %-15s | Details: %s\n",
+                        e.getTimestamp().format(TIMESTAMP_FORMAT),
+                        e.getEventType(),
+                        e.getSourceIP(),
+                        e.getDetails()));
             }
-        } else {
-            report.append("  No correlated incidents detected.\n\n");
+            sb.append("\n");
         }
 
-        // ─── Summary ────────────────────────────────────────────
-        report.append(SEPARATOR).append("\n");
-        report.append("SUMMARY\n");
-        report.append(SEPARATOR).append("\n\n");
-
-        // Count file events
-        int filesModified = 0, filesMissing = 0, filesAdded = 0;
-        if (fileRecords != null) {
-            for (FileRecord r : fileRecords) {
-                switch (r.getStatus()) {
-                    case MODIFIED: filesModified++; break;
-                    case MISSING:  filesMissing++;  break;
-                    case NEW:      filesAdded++;    break;
-                }
-            }
-        }
-
-        int authAlertCount = 0;
-        if (authResults != null) {
-            for (AuthenticationMonitor.AuthResult r : authResults) {
-                if (r.isAlert()) authAlertCount++;
-            }
-        }
-
-        int fwDropCount = firewallResults != null ? firewallResults.size() : 0;
-        int correlatedCount = correlatedAlerts != null ? correlatedAlerts.size() : 0;
-
-        report.append(String.format("  Files Modified:        %d\n", filesModified));
-        report.append(String.format("  Files Missing:         %d\n", filesMissing));
-        report.append(String.format("  Files Added:           %d\n", filesAdded));
-        report.append(String.format("  Authentication Alerts: %d\n", authAlertCount));
-        report.append(String.format("  Firewall DROP Sources: %d\n", fwDropCount));
-        report.append(String.format("  Correlated Incidents:  %d\n", correlatedCount));
-        report.append("\n");
-        report.append("  Overall Risk: ").append(overallRisk).append("\n");
-        report.append("\n").append(SEPARATOR).append("\n");
+        sb.append(SEPARATOR).append("\n");
+        sb.append("                       END OF REPORT\n");
+        sb.append(SEPARATOR).append("\n");
 
         // Write to file
-        String reportContent = report.toString();
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(reportFile))) {
-            writer.write(reportContent);
+            writer.write(sb.toString());
         }
 
         // Also print to console
-        System.out.println(reportContent);
+        System.out.println(sb.toString());
+    }
+
+    /**
+     * Legacy method skeleton kept for build safety, calling the upgraded stateful reporter.
+     */
+    public void generateReport(Object fileRecords, Object authResults, Object firewallResults,
+                               Object alerts, Object correlatedAlerts, Severity overallRisk,
+                               File reportFile) throws IOException {
+        // Fallback or legacy wrapper (unused in 2.0 flow but compiles)
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(reportFile))) {
+            writer.write("SentinelCheck 1.0 legacy report wrapper. Please run stateful scan instead.");
+        }
     }
 }

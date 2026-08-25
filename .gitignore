@@ -29,3 +29,6 @@ desktop.ini
 # Temporary files
 *.tmp
 *.log
+
+# Local state database
+data/

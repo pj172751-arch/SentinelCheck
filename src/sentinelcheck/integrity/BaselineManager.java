@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
@@ -13,19 +14,7 @@ import java.util.Map;
 
 /**
  * Manages the SHA-256 hash baseline for a monitored directory.
- *
- * Baseline file format (properties-style, inspired by
- * karsany/file-integrity-check PropertiesFileIntegrityDatabase):
- *
- *   # SentinelCheck Baseline
- *   # Created: 2026-08-24T21:30:00
- *   # Directory: monitored
- *   # Files: 5
- *   config.txt=abc123...
- *   users.csv=7f92...
- *
- * The file uses '=' as the delimiter between relative file path
- * and its SHA-256 hash. Comment lines start with '#'.
+ * Includes baseline integrity verification via a sibling .sha256 checksum file.
  */
 public class BaselineManager {
 
@@ -42,14 +31,9 @@ public class BaselineManager {
 
     /**
      * Creates a new baseline file by hashing every file in the directory.
-     *
-     * @param directory    the folder to scan
-     * @param baselineFile where to write the baseline
-     * @return the number of files hashed
-     * @throws IOException if directory cannot be read or baseline cannot be written
+     * Also writes a sibling .sha256 file containing the baseline's own hash.
      */
     public int createBaseline(File directory, File baselineFile) throws IOException {
-
         if (!directory.isDirectory()) {
             throw new IOException("Not a directory: " + directory.getAbsolutePath());
         }
@@ -64,6 +48,10 @@ public class BaselineManager {
         for (File file : files) {
             if (file.isFile()) {
                 String relativePath = file.getName();
+                // Exclude any temporary or checksum files if needed
+                if (relativePath.endsWith(".baseline") || relativePath.endsWith(".sha256")) {
+                    continue;
+                }
                 String hash = hashCalculator.calculateSHA256(file);
                 hashes.put(relativePath, hash);
             }
@@ -89,18 +77,16 @@ public class BaselineManager {
             }
         }
 
+        // Write baseline checksum for integrity validation
+        writeBaselineChecksum(baselineFile);
+
         return hashes.size();
     }
 
     /**
      * Loads a previously saved baseline from disk.
-     *
-     * @param baselineFile the baseline file to read
-     * @return map of relative file path → SHA-256 hash
-     * @throws IOException if the file cannot be read
      */
     public Map<String, String> loadBaseline(File baselineFile) throws IOException {
-
         Map<String, String> baseline = new LinkedHashMap<>();
 
         try (BufferedReader reader = new BufferedReader(new FileReader(baselineFile))) {
@@ -123,5 +109,40 @@ public class BaselineManager {
         }
 
         return baseline;
+    }
+
+    /**
+     * Computes the hash of the baseline file and saves it to a sibling .sha256 file.
+     */
+    public void writeBaselineChecksum(File baselineFile) throws IOException {
+        String baselineHash = hashCalculator.calculateSHA256(baselineFile);
+        File shaFile = new File(baselineFile.getAbsolutePath() + ".sha256");
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(shaFile))) {
+            writer.write(baselineHash);
+        }
+    }
+
+    /**
+     * Checks if the baseline file matches its recorded SHA-256 checksum.
+     * Returns true if valid, false if tampered or if checksum is missing.
+     */
+    public boolean verifyBaselineIntegrity(File baselineFile) {
+        if (!baselineFile.exists()) {
+            return false;
+        }
+
+        File shaFile = new File(baselineFile.getAbsolutePath() + ".sha256");
+        if (!shaFile.exists()) {
+            return false;
+        }
+
+        try {
+            String currentHash = hashCalculator.calculateSHA256(baselineFile);
+            String expectedHash = new String(Files.readAllBytes(shaFile.toPath())).trim();
+            return currentHash.equalsIgnoreCase(expectedHash);
+        } catch (IOException e) {
+            System.err.println("  [ERROR] Failed to verify baseline integrity: " + e.getMessage());
+            return false;
+        }
     }
 }
