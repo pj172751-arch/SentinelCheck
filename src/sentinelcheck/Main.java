@@ -203,23 +203,38 @@ public class Main {
             }
         }
 
+        String coloredState = watcherStatus.equals("ACTIVE") ? "\u001B[32mACTIVE\u001B[0m" : "\u001B[31mINACTIVE\u001B[0m";
+        String coloredRisk;
+        if (currentRisk == Severity.CRITICAL) {
+            coloredRisk = "\u001B[31mCRITICAL\u001B[0m";
+        } else if (currentRisk == Severity.HIGH) {
+            coloredRisk = "\u001B[35mHIGH\u001B[0m";
+        } else if (currentRisk == Severity.MEDIUM) {
+            coloredRisk = "\u001B[33mMEDIUM\u001B[0m";
+        } else {
+            coloredRisk = "\u001B[32mLOW\u001B[0m";
+        }
+
         System.out.println();
-        System.out.println("  +==================================================================+");
-        System.out.println("  |                         SENTINELCHECK                            |");
-        System.out.println("  |                  HOST SECURITY MONITOR v2.0                      |");
-        System.out.println("  +==================================================================+");
-        System.out.printf("  | Status: MONITORING %-9s Risk: %-9s Score: %-12d |\n", 
-                watcherStatus, currentRisk, maxRisk);
-        System.out.printf("  | Protected Files: %-12d Open Incidents: %-19d |\n", 
-                protectedFilesCount, openIncidentsCount);
-        System.out.println("  +==================================================================+");
+        printBorder();
+        printCenteredRow("SENTINELCHECK");
+        printCenteredRow("HOST SECURITY MONITOR v2.0");
+        printBorder();
+        
+        String statusRow = String.format("Status: MONITORING %s    Risk: %s    Score: %d", coloredState, coloredRisk, maxRisk);
+        printRow(statusRow);
+        
+        String infoRow = String.format("Protected Files: %d    Open Incidents: %d", protectedFilesCount, openIncidentsCount);
+        printRow(infoRow);
+        
+        printBorder();
         System.out.println("  [1] Monitoring");
         System.out.println("  [2] Security Analysis");
         System.out.println("  [3] Incident Management");
         System.out.println("  [4] Configuration");
         System.out.println("  [5] System Status");
         System.out.println("  [0] Exit");
-        System.out.println("  +==================================================================+");
+        printBorder();
         System.out.println();
     }
 
@@ -1034,26 +1049,99 @@ public class Main {
             lastEventTime = last.getTimestamp().format(TIME_FORMAT);
         }
 
-        System.out.println("\n  +==================================================================+");
-        System.out.println("  |                       SENTINELCHECK STATUS                       |");
+        String coloredMonitor = monitorState.equals("ACTIVE") ? "\u001B[32mACTIVE\u001B[0m" : "\u001B[31mINACTIVE\u001B[0m";
+        String coloredWatcher = monitorState.equals("ACTIVE") ? "\u001B[32mRUNNING\u001B[0m" : "\u001B[31mSTOPPED\u001B[0m";
+        
+        String coloredBaseline;
+        if (baselineState.equals("VALID")) {
+            coloredBaseline = "\u001B[32mVALID\u001B[0m";
+        } else if (baselineState.equals("TAMPERED")) {
+            coloredBaseline = "\u001B[31mTAMPERED\u001B[0m";
+        } else {
+            coloredBaseline = "\u001B[33mMISSING\u001B[0m";
+        }
+
+        String coloredRisk;
+        if (currentRisk == Severity.CRITICAL) {
+            coloredRisk = "\u001B[31mCRITICAL\u001B[0m";
+        } else if (currentRisk == Severity.HIGH) {
+            coloredRisk = "\u001B[35mHIGH\u001B[0m";
+        } else if (currentRisk == Severity.MEDIUM) {
+            coloredRisk = "\u001B[33mMEDIUM\u001B[0m";
+        } else {
+            coloredRisk = "\u001B[32mLOW\u001B[0m";
+        }
+
+        String coloredMaint = incidentManager.isMaintenanceMode() ? "\u001B[33mENABLED\u001B[0m" : "\u001B[32mDISABLED\u001B[0m";
+
+        System.out.println();
+        printBorder();
+        printCenteredRow("SENTINELCHECK STATUS");
+        printBorder();
+        
+        printFieldRow("Monitoring Status       : ", coloredMonitor);
+        printFieldRow("File Watcher Thread     : ", coloredWatcher);
+        printFieldRow("Baseline Integrity      : ", coloredBaseline);
+        printFieldRow("Monitored Folder        : ", monitoredDir);
+        printFieldRow("Protected Files Hashed  : ", String.valueOf(protectedFilesCount));
+        printCenteredRow("");
+        printFieldRow("Events Logged Today     : ", String.valueOf(eventsToday));
+        printFieldRow("Total Historical Events : ", String.valueOf(totalEvents));
+        printFieldRow("Open Incident Count     : ", String.valueOf(openIncidentsCount));
+        printCenteredRow("");
+        printFieldRow("Last Event Registered   : ", lastEventStr);
+        printFieldRow("Last Event Log Time     : ", lastEventTime);
+        printCenteredRow("");
+        printFieldRow("Current System Severity : ", coloredRisk);
+        printFieldRow("Max Active Risk Score   : ", String.valueOf(maxRisk));
+        printFieldRow("Maintenance Mode        : ", coloredMaint);
+        
+        printBorder();
+    }
+
+    private static void printBorder() {
         System.out.println("  +==================================================================+");
-        System.out.printf("  | Monitoring Status       : %-46s |\n", monitorState);
-        System.out.printf("  | File Watcher Thread     : %-46s |\n", monitorState.equals("ACTIVE") ? "RUNNING" : "STOPPED");
-        System.out.printf("  | Baseline Integrity      : %-46s |\n", baselineState);
-        System.out.printf("  | Monitored Folder        : %-46s |\n", monitoredDir);
-        System.out.printf("  | Protected Files Hashed  : %-46d |\n", protectedFilesCount);
-        System.out.println("  |                                                                  |");
-        System.out.printf("  | Events Logged Today     : %-46d |\n", eventsToday);
-        System.out.printf("  | Total Historical Events : %-46d |\n", totalEvents);
-        System.out.printf("  | Open Incident Count     : %-46d |\n", openIncidentsCount);
-        System.out.println("  |                                                                  |");
-        System.out.printf("  | Last Event Registered   : %-46s |\n", lastEventStr);
-        System.out.printf("  | Last Event Log Time     : %-46s |\n", lastEventTime);
-        System.out.println("  |                                                                  |");
-        System.out.printf("  | Current System Severity : %-46s |\n", currentRisk);
-        System.out.printf("  | Max Active Risk Score   : %-46d |\n", maxRisk);
-        System.out.printf("  | Maintenance Mode        : %-46s |\n", incidentManager.isMaintenanceMode() ? "ENABLED" : "DISABLED");
-        System.out.println("  +==================================================================+");
+    }
+
+    private static void printCenteredRow(String text) {
+        String stripped = text.replaceAll("\u001B\\[[;\\d]*m", "");
+        int dataWidth = 66;
+        int paddingLeft = (dataWidth - stripped.length()) / 2;
+        int paddingRight = dataWidth - stripped.length() - paddingLeft;
+        
+        System.out.print("  | ");
+        for (int i = 0; i < paddingLeft; i++) {
+            System.out.print(" ");
+        }
+        System.out.print(text);
+        for (int i = 0; i < paddingRight; i++) {
+            System.out.print(" ");
+        }
+        System.out.println(" |");
+    }
+
+    private static void printRow(String content) {
+        String stripped = content.replaceAll("\u001B\\[[;\\d]*m", "");
+        int dataWidth = 66;
+        int padding = dataWidth - stripped.length();
+        System.out.print("  | " + content);
+        for (int i = 0; i < padding; i++) {
+            System.out.print(" ");
+        }
+        System.out.println(" |");
+    }
+
+    private static void printFieldRow(String label, String value) {
+        String strippedLabel = label.replaceAll("\u001B\\[[;\\d]*m", "");
+        String strippedValue = value.replaceAll("\u001B\\[[;\\d]*m", "");
+        int dataWidth = 66;
+        int padding = dataWidth - strippedLabel.length() - strippedValue.length();
+        
+        System.out.print("  | " + label + value);
+        for (int i = 0; i < padding; i++) {
+            System.out.print(" ");
+        }
+        System.out.println(" |");
     }
 
     // ─── Non-interactive Scan (Batch execution pipeline) ──────────
