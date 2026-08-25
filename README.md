@@ -1,162 +1,129 @@
-# SentinelCheck
+# SentinelCheck v2.0
 
-**Lightweight Host-Based Security Event Monitor**
+**Stateful Host-Based Security Event Monitor**
 
-A Java console application that demonstrates host-based security monitoring
-through file integrity verification, authentication log analysis, firewall
-event detection, alert correlation, risk scoring, and incident reporting.
+SentinelCheck is a Java console application that demonstrates host-based security monitoring (HIDS) through real-time file integrity verification, authentication log analysis, firewall event auditing, sliding-window threat rules, multi-module correlation, stateful incident lifecycle management, and persistent database tracking.
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
-```
-                         SENTINELCHECK
-                              |
-              +---------------+---------------+
-              |               |               |
-              v               v               v
-       File Integrity   Authentication    Firewall Events
-          Monitor          Monitor           Monitor
-              |               |               |
-              v               v               v
-        SHA-256 hashes    Failed logins    DROP events
-              |               |               |
-              +---------------+---------------+
-                              |
-                              v
-                     Alert Engine + Risk Scorer
-                              |
-                              v
-                       Event Correlation
-                              |
-                              v
-                       Incident Report
-```
-
-**Pipeline:** Collect -> Hash/Parse -> Detect -> Correlate -> Score -> Report
-
----
-
-## Modules
-
-### 1. File Integrity Monitoring
-- Computes SHA-256 hashes for all files in a monitored directory
-- Creates a `.baseline` file storing filename-hash pairs
-- Detects four states: **UNCHANGED**, **MODIFIED**, **MISSING**, **NEW**
-- Reports old and new hashes for modified files (forensic evidence)
-
-### 2. Authentication Monitoring
-- Parses CSV-formatted authentication logs
-- Groups `FAILED_LOGIN` events by source IP
-- Alerts when failed attempts >= 3 (configurable threshold)
-- Severity tiers: 3-4 = MEDIUM, 5-9 = HIGH, 10+ = CRITICAL
-
-### 3. Firewall Event Monitoring
-- Parses CSV-formatted firewall logs
-- Detects and groups `FIREWALL_DROP` events by source IP
-- Tracks targeted ports and protocols
-
-### 4. Alert Engine + Risk Scoring
-- Aggregates alerts from all three modules
-- Transparent, rule-based scoring:
-
-| Event                    | Score |
-|--------------------------|------:|
-| Failed login             |   +10 |
-| 3+ failed logins (bonus) |   +30 |
-| Firewall DROP            |   +15 |
-| Critical file modified   |   +40 |
-| New file detected        |   +20 |
-| Missing file             |   +30 |
-
-- Severity: 0-29 LOW, 30-59 MEDIUM, 60-89 HIGH, 90+ CRITICAL
-
-### 5. Event Correlation
-- Connects related events by source IP address
-- When the same IP triggers alerts in multiple modules
-  (e.g., brute-force + firewall DROP), a correlated incident
-  is created with elevated severity
-
-### 6. Incident Report
-- Plain-text report with sections for each module
-- Includes IP summary table, SHA-256 hashes, targeted ports
-- Summary with counts and overall risk level
-
----
-
-## Requirements
-
-- **Java 17** or later (JDK required for compilation)
-
----
-
-## Build and Run
-
-### Compile
-
-```bash
-javac -encoding UTF-8 -d out -sourcepath src src/sentinelcheck/*.java src/sentinelcheck/**/*.java
+```text
+                               SENTINELCHECK 2.0
+                                      |
+                    +-----------------+-----------------+
+                    |                                   |
+                    v                                   v
+             REAL-TIME MONITOR                    LOG ANALYSIS
+              WatchService                       Auth / Firewall
+                    |                                   |
+                    +-----------------+-----------------+
+                                      |
+                                      v
+                             SECURITY EVENT HISTORY
+                               (data/events.csv)
+                                      |
+                                      v
+                             DETECTION ENGINE
+                                      |
+                                      v
+                                   ALERTS
+                               (FILE-001...FW-001)
+                                      |
+                                      v
+                               EVENT CORRELATOR
+                                      |
+                                      v
+                                 RISK SCORING
+                                      |
+                                      v
+                            INCIDENT MANAGEMENT
+                             (data/incidents.csv)
+                               /            \
+                              v              v
+                         TIMELINE        AUDIT TRAIL
+                              \              /
+                               v            v
+                               STATEFUL REPORTS
 ```
 
-### Run (Interactive Menu)
+---
 
-```bash
+## 🛠️ Key Capabilities & Modules
+
+### 1. Sibling Checksum Baseline Integrity Check
+- Creates a baseline (`monitored.baseline`) containing filenames and expected SHA-256 hashes.
+- Generates a sibling checksum file (`monitored.baseline.sha256`) containing the baseline file's own hash.
+- Validates the baseline itself on start to detect tampering attacks (`FILE-004`).
+
+### 2. Real-Time File Watcher (NIO `WatchService`)
+- Spawns a background daemon thread monitoring folder modifications.
+- Implements a **500ms event debouncer** to coalesce rapid duplicate file system notify events.
+- Safely handles lock errors and file disappearance exceptions without stopping monitoring services.
+- Promotes file violations (`FILE-001` Modified, `FILE-002` Missing, `FILE-003` New) directly to incidents to ensure visibility.
+
+### 3. Log Threat Intelligence Heuristics (Sliding-Window Rules)
+- **AUTH-001 (Brute Force)**: Identifies failed login attempts $\ge 3$ within a sliding 5-minute window.
+- **AUTH-002 (Suspicious Success)**: Identifies successful logins occurring right after failed attempts from the same source IP.
+- **AUTH-003 (Multiple Account Targeting)**: Flags when logins target $\ge 3$ unique usernames from the same source IP.
+- **FW-001 (Port Probing)**: Audits DROP events from the same source IP targeting $\ge 5$ *unique destination ports* (diversity scan check).
+
+### 4. Stateful Correlation & Lifecycle Manager
+- Log entries and file events are written to `data/events.csv`.
+- Related alerts are grouped into an Incident based on source context (source IP or `LOCAL` scope) and temporal proximity (10-minute window).
+- Automatically applies correlation alerts and score bonuses (`CORR-001`) if events span multiple security modules.
+- Tracks tickets through state machine transitions: `OPEN` $\rightarrow$ `ACKNOWLEDGED` $\rightarrow$ `CLOSED`.
+- Audit logs record operator actions and timestamp details inside `data/incidents.csv`.
+
+---
+
+## 📊 Security Rules & Risk Weights
+
+| Rule ID | Rule Name | Category | Points | Default Severity | Description |
+| :--- | :--- | :--- | :---: | :---: | :--- |
+| **FILE-001** | File Modified | File Integrity | 40 | MEDIUM | SHA-256 mismatch detected |
+| **FILE-002** | File Missing | File Integrity | 30 | MEDIUM | Protected file deleted |
+| **FILE-003** | New File | File Integrity | 20 | LOW | Untracked file created (exe = Suspicious Executable) |
+| **FILE-004** | Baseline Tampered | Baseline Checksum | 100 | CRITICAL | Baseline file checksum mismatch |
+| **AUTH-001** | Brute Force | Authentication | 30 | MEDIUM | Multiple failed logins within window |
+| **AUTH-002** | Suspicious Success | Authentication | 50 | MEDIUM | Successful login after failures |
+| **AUTH-003** | Multi-Account | Authentication | 40 | MEDIUM | Targeting multiple users from one IP |
+| **FW-001** | Port Probing | Firewall Drop | 30 | MEDIUM | Scanning multiple unique ports |
+| **CORR-001** | Multi-Module | Correlation | 20 | HIGH | Bonus for cross-module attacks |
+
+### Severity Scale:
+- `0–29`: **LOW**
+- `30–59`: **MEDIUM**
+- `60–99`: **HIGH**
+- `100+`: **CRITICAL**
+
+---
+
+## ⚙️ Requirements & Execution
+
+* **Java 17** or later (JDK required for build).
+
+### Build Project:
+```powershell
+javac -encoding UTF-8 -d out -sourcepath src (Get-ChildItem -Path src -Filter *.java -Recurse | ForEach-Object { $_.FullName })
+```
+
+### Start Dashboard & Nested CLI:
+```powershell
 java -cp out sentinelcheck.Main
 ```
 
-### Run (Full Scan, Non-Interactive)
-
-```bash
+### Start Batch Scan (Non-interactive mode):
+```powershell
 java -cp out sentinelcheck.Main --scan
 java -cp out sentinelcheck.Main --scan --dir monitored --logs sample-logs
 ```
 
 ---
 
-## Interactive Menu
+## 🗂️ Project File Structure
 
-```
-  +==========================================+
-  |          SENTINELCHECK v1.0              |
-  |  Host-Based Security Event Monitor      |
-  +==========================================+
-
-  [1] Create File Integrity Baseline
-  [2] Verify File Integrity
-  [3] Analyze Security Logs
-  [4] Generate Full Incident Report
-  [5] Run Complete Security Scan
-  [0] Exit
-```
-
----
-
-## Sample Log Formats
-
-### Authentication Log (`sample-logs/auth_log.csv`)
-
-```
-2026-08-24 10:03:22,FAILED_LOGIN,admin,192.168.1.20
-2026-08-24 10:05:11,SUCCESSFUL_LOGIN,agarwal,192.168.1.30
-```
-
-Format: `timestamp,EVENT_TYPE,username,source_ip`
-
-### Firewall Log (`sample-logs/firewall_log.csv`)
-
-```
-2026-08-24 10:15:42,FIREWALL_DROP,10.0.0.15,192.168.1.1,22,TCP
-2026-08-24 10:30:10,FIREWALL_ACCEPT,192.168.1.10,192.168.1.1,443,TCP
-```
-
-Format: `timestamp,EVENT_TYPE,source_ip,dest_ip,port,protocol`
-
----
-
-## Project Structure
-
-```
+```text
 SentinelCheck/
 |-- src/sentinelcheck/
 |   |-- Main.java
@@ -164,21 +131,26 @@ SentinelCheck/
 |   |   |-- FileRecord.java
 |   |   |-- SecurityEvent.java
 |   |   |-- Alert.java
+|   |   |-- Incident.java              [NEW]
+|   |   |-- IncidentStatus.java        [NEW]
 |   |   |-- FileStatus.java
 |   |   |-- EventType.java
 |   |   +-- Severity.java
 |   |-- integrity/
 |   |   |-- HashCalculator.java
 |   |   |-- BaselineManager.java
-|   |   +-- IntegrityChecker.java
+|   |   |-- IntegrityChecker.java
+|   |   +-- FileMonitor.java           [NEW]
 |   |-- logs/
 |   |   |-- LogParser.java
 |   |   |-- AuthenticationMonitor.java
 |   |   +-- FirewallMonitor.java
 |   |-- detection/
-|   |   |-- AlertEngine.java
-|   |   |-- RiskScorer.java
-|   |   +-- EventCorrelator.java
+|   |   |-- DetectionEngine.java        [NEW]
+|   |   |-- EventHistory.java          [NEW]
+|   |   |-- IncidentManager.java       [NEW]
+|   |   |-- EventCorrelator.java
+|   |   +-- RiskScorer.java
 |   +-- report/
 |       +-- IncidentReportGenerator.java
 |-- sample-logs/
@@ -190,77 +162,5 @@ SentinelCheck/
 |   |-- settings.json
 |   |-- server.conf
 |   +-- readme.txt
-+-- reports/              (generated, gitignored)
++-- reports/                           (gitignored)
 ```
-
----
-
-## Demonstration
-
-### Step 1: Create Baseline
-Run option [1] to hash all files in `monitored/`.
-
-### Step 2: Tamper with Files
-- Modify `monitored/config.txt`
-- Delete `monitored/users.csv`
-- Add a new file `monitored/malware.exe`
-
-### Step 3: Run Security Scan
-Run option [5] to detect all changes and analyze logs.
-
-### Step 4: Review Report
-Check `reports/incident_report_<timestamp>.txt` for the full report.
-
----
-
-## Scope Limitations
-
-This is a demonstration tool for educational purposes. It does NOT:
-- Monitor real system logs or live network traffic
-- Configure or modify actual firewalls
-- Perform packet capture or deep packet inspection
-- Block IP addresses or perform automatic remediation
-- Scan for malware or viruses
-- Use machine learning for threat detection
-
----
-
-## NSM Concepts Demonstrated
-
-- File integrity verification (SHA-256 hashing)
-- Authentication failure detection (brute-force patterns)
-- Firewall event monitoring (DROP analysis)
-- Security event normalization and correlation
-- Rule-based risk scoring
-- Incident reporting and forensic evidence
-
----
-
-## OOP Concepts
-
-| Concept            | Where                                          |
-|--------------------|------------------------------------------------|
-| Classes & Objects  | All 16 classes                                 |
-| Enums              | FileStatus, EventType, Severity                |
-| Encapsulation      | Private fields + getters in all model classes  |
-| Collections        | ArrayList, HashMap, LinkedHashMap              |
-| Exception Handling | File I/O, parsing, hash calculation            |
-| File I/O           | Baseline, log parsing, report generation       |
-| Hashing            | java.security.MessageDigest (SHA-256)          |
-| String Parsing     | CSV parsing, event type mapping                |
-| Java Time API      | LocalDateTime, DateTimeFormatter               |
-| Inner Classes      | AuthResult, FirewallResult                     |
-
----
-
-## References
-
-- [file-integrity-check](https://github.com/karsany/file-integrity-check) - SHA-256 file baselines
-- [Digital-Forensics-Analyzer](https://github.com/oams84/Digital-Forensics-Analyzer) - Log analysis and reporting
-- [gchecksum](https://github.com/Glavo/gchecksum) - Checksum verification behavior
-
----
-
-## Author
-
-Computer Engineering Diploma Project - Network Security Monitoring
