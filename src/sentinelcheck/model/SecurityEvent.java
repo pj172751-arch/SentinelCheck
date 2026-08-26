@@ -20,6 +20,11 @@ public class SecurityEvent {
     private final String details;
     private final String authorizationContext; // e.g. "UNAUTHORIZED" or "MAINTENANCE"
 
+    private static String cleanField(String val) {
+        if (val == null) return "";
+        return val.replace("\r", "").replace("\n", " ").replace("|", "/");
+    }
+
     /**
      * Comprehensive constructor (11 parameters).
      */
@@ -28,16 +33,17 @@ public class SecurityEvent {
                          int port, String protocol, String details, String authorizationContext) {
         this.timestamp = timestamp;
         this.eventType = eventType;
-        this.sourceIP = sourceIP == null || sourceIP.isEmpty() ? "LOCAL" : sourceIP;
-        this.destinationIP = destinationIP == null ? "" : destinationIP;
-        this.username = username == null ? "" : username;
-        this.filePath = filePath == null ? "" : filePath;
-        this.fileHash = fileHash == null ? "" : fileHash;
+        String cleanSrc = cleanField(sourceIP);
+        this.sourceIP = cleanSrc.isEmpty() ? "LOCAL" : cleanSrc;
+        this.destinationIP = cleanField(destinationIP);
+        this.username = cleanField(username);
+        this.filePath = cleanField(filePath);
+        this.fileHash = cleanField(fileHash);
         this.port = port;
-        this.protocol = protocol == null ? "" : protocol;
-        this.details = details == null ? "" : details.replace("|", " ");
-        this.authorizationContext = authorizationContext == null || authorizationContext.isEmpty() 
-                                    ? "UNAUTHORIZED" : authorizationContext;
+        this.protocol = cleanField(protocol);
+        this.details = cleanField(details);
+        String cleanAuth = cleanField(authorizationContext);
+        this.authorizationContext = cleanAuth.isEmpty() ? "UNAUTHORIZED" : cleanAuth;
     }
 
     /**

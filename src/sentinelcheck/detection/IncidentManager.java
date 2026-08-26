@@ -6,12 +6,10 @@ import sentinelcheck.model.IncidentStatus;
 import sentinelcheck.model.SecurityEvent;
 import sentinelcheck.model.Severity;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -25,10 +23,10 @@ import java.util.List;
  */
 public class IncidentManager {
 
-    private static final String INCIDENTS_FILE = "data/incidents.csv";
-    private final List<Incident> incidents;
-    private final List<Alert> unpromotedAlerts; // Caches standalone alerts that haven't triggered an incident
-    private final List<String> maintenanceAuditTrail;
+    private static final Path INCIDENTS_FILE = Path.of("data", "incidents.csv");
+    private final List<Incident> incidents = new ArrayList<>();
+    private final List<Alert> unpromotedAlerts = new ArrayList<>();
+    private final List<String> maintenanceAuditTrail = new ArrayList<>();
     private final RiskScorer riskScorer;
 
     private int incidentCounter = 1;
@@ -37,18 +35,10 @@ public class IncidentManager {
     private int correlationWindowMinutes = 10;
 
     public IncidentManager(RiskScorer riskScorer) {
-        this.incidents = new ArrayList<>();
-        this.unpromotedAlerts = new ArrayList<>();
-        this.maintenanceAuditTrail = new ArrayList<>();
         this.riskScorer = riskScorer;
-        ensureDataDirExists();
-    }
-
-    private void ensureDataDirExists() {
-        File dataDir = new File("data");
-        if (!dataDir.exists()) {
-            dataDir.mkdirs();
-        }
+        try {
+            Files.createDirectories(INCIDENTS_FILE.getParent());
+        } catch (IOException ignored) {}
     }
 
     public synchronized boolean isMaintenanceMode() {
@@ -227,11 +217,12 @@ public class IncidentManager {
      * Persists all stateful incidents to data/incidents.csv.
      */
     public synchronized void saveIncidents() {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(INCIDENTS_FILE))) {
-            for (Incident inc : incidents) {
-                writer.write(inc.toCSVLine());
-                writer.newLine();
-            }
+        StringBuilder sb = new StringBuilder();
+        for (Incident inc : incidents) {
+            sb.append(inc.toCSVLine()).append(System.lineSeparator());
+        }
+        try {
+            Files.writeString(INCIDENTS_FILE, sb.toString());
         } catch (IOException e) {
             System.err.println("  [ERROR] Failed to save incidents: " + e.getMessage());
         }
@@ -242,19 +233,13 @@ public class IncidentManager {
      */
     public synchronized void loadIncidents(List<Alert> allAlerts) {
         incidents.clear();
-        File file = new File(INCIDENTS_FILE);
-        if (!file.exists()) {
-            return;
-        }
+        if (!Files.exists(INCIDENTS_FILE)) return;
 
         int maxCounter = 0;
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
+        try {
+            for (String line : Files.readAllLines(INCIDENTS_FILE)) {
                 line = line.trim();
-                if (line.isEmpty()) {
-                    continue;
-                }
+                if (line.isEmpty()) continue;
 
                 try {
                     String[] parts = line.split("\\|", -1);
@@ -281,8 +266,7 @@ public class IncidentManager {
                     
                     // Re-bind alerts
                     if (!alertIdsStr.isEmpty()) {
-                        String[] alertIds = alertIdsStr.split(",");
-                        for (String aid : alertIds) {
+                        for (String aid : alertIdsStr.split(",")) {
                             Alert matchedAlert = findAlertById(aid, allAlerts);
                             if (matchedAlert != null) {
                                 incident.addAlert(matchedAlert);
@@ -290,24 +274,20 @@ public class IncidentManager {
                         }
                     }
 
-                    // Re-bind audit trail (clear the auto-generated log from constructor first)
+                    // Re-bind audit trail
                     incident.getAuditTrail().clear();
                     if (!auditTrailStr.isEmpty()) {
-                        String[] auditLogs = auditTrailStr.split(";");
-                        for (String auditLog : auditLogs) {
+                        for (String auditLog : auditTrailStr.split(";")) {
                             incident.loadAuditLogEntry(auditLog);
                         }
                     }
 
                     incidents.add(incident);
-
                 } catch (Exception e) {
                     System.err.println("  [WARN] Skipping malformed incident entry: " + e.getMessage());
                 }
             }
-
             this.incidentCounter = maxCounter + 1;
-
         } catch (IOException e) {
             System.err.println("  [ERROR] Failed to load incidents: " + e.getMessage());
         }
@@ -336,9 +316,8 @@ public class IncidentManager {
         unpromotedAlerts.clear();
         maintenanceAuditTrail.clear();
         incidentCounter = 1;
-        File file = new File(INCIDENTS_FILE);
-        if (file.exists()) {
-            file.delete();
-        }
+        try {
+            Files.deleteIfExists(INCIDENTS_FILE);
+        } catch (IOException ignored) {}
     }
 }

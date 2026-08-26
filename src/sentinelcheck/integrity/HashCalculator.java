@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
+import java.util.HexFormat;
+
 /**
  * Computes SHA-256 hash digests for files.
  *
@@ -40,25 +42,11 @@ public class HashCalculator {
                 }
             }
 
-            return bytesToHex(digest.digest());
+            return HexFormat.of().formatHex(digest.digest());
 
         } catch (NoSuchAlgorithmException e) {
             // SHA-256 is guaranteed to be available in every JDK
             throw new RuntimeException("SHA-256 algorithm not available", e);
         }
-    }
-
-    /**
-     * Converts a byte array to a lowercase hexadecimal string.
-     *
-     * @param bytes the byte array to convert
-     * @return hex string representation
-     */
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder hex = new StringBuilder(bytes.length * 2);
-        for (byte b : bytes) {
-            hex.append(String.format("%02x", b));
-        }
-        return hex.toString();
     }
 }

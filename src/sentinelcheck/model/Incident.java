@@ -103,7 +103,8 @@ public class Incident {
     }
 
     public void addAuditLog(String action) {
-        String logEntry = LocalDateTime.now().format(TIME_FORMAT) + " - " + action;
+        String cleanAction = action == null ? "" : action.replace("\r", "").replace("\n", " ").replace("|", "/").replace(";", ",");
+        String logEntry = LocalDateTime.now().format(TIME_FORMAT) + " - " + cleanAction;
         auditTrail.add(logEntry);
     }
 

@@ -2,12 +2,11 @@ package sentinelcheck.detection;
 
 import sentinelcheck.model.SecurityEvent;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,29 +16,23 @@ import java.util.List;
  */
 public class EventHistory {
 
-    private static final String EVENTS_FILE = "data/events.csv";
-    private final List<SecurityEvent> events;
+    private static final Path EVENTS_FILE = Path.of("data", "events.csv");
+    private final List<SecurityEvent> events = new ArrayList<>();
 
     public EventHistory() {
-        this.events = new ArrayList<>();
-        ensureDataDirExists();
-    }
-
-    private void ensureDataDirExists() {
-        File dataDir = new File("data");
-        if (!dataDir.exists()) {
-            dataDir.mkdirs();
-        }
+        try {
+            Files.createDirectories(EVENTS_FILE.getParent());
+        } catch (IOException ignored) {}
     }
 
     public synchronized void addEvent(SecurityEvent event) {
         if (events.contains(event)) {
-            return; // Skip duplicate events to prevent redundant logs
+            return;
         }
         events.add(event);
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(EVENTS_FILE, true))) {
-            writer.write(event.toCSVLine());
-            writer.newLine();
+        try {
+            Files.writeString(EVENTS_FILE, event.toCSVLine() + System.lineSeparator(),
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {
             System.err.println("  [ERROR] Failed to persist event: " + e.getMessage());
         }
@@ -50,21 +43,14 @@ public class EventHistory {
      */
     public synchronized void loadEvents() {
         events.clear();
-        File file = new File(EVENTS_FILE);
-        if (!file.exists()) {
-            return;
-        }
+        if (!Files.exists(EVENTS_FILE)) return;
 
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
+        try {
+            for (String line : Files.readAllLines(EVENTS_FILE)) {
                 line = line.trim();
-                if (line.isEmpty()) {
-                    continue;
-                }
+                if (line.isEmpty()) continue;
                 try {
-                    SecurityEvent event = SecurityEvent.fromCSVLine(line);
-                    events.add(event);
+                    events.add(SecurityEvent.fromCSVLine(line));
                 } catch (Exception e) {
                     System.err.println("  [WARN] Skipping malformed history event: " + e.getMessage());
                 }
@@ -97,9 +83,8 @@ public class EventHistory {
      */
     public synchronized void clear() {
         events.clear();
-        File file = new File(EVENTS_FILE);
-        if (file.exists()) {
-            file.delete();
-        }
+        try {
+            Files.deleteIfExists(EVENTS_FILE);
+        } catch (IOException ignored) {}
     }
 }

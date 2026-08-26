@@ -4,47 +4,20 @@ import java.time.LocalDateTime;
 
 /**
  * Represents the integrity state of a single monitored file.
- *
- * Captures the file path, current and previous SHA-256 hashes,
- * the detected status (UNCHANGED / MODIFIED / MISSING / NEW),
- * and the timestamp when the check was performed.
  */
-public class FileRecord {
-
-    private final String filePath;
-    private final String oldHash;
-    private final String newHash;
-    private final FileStatus status;
-    private final LocalDateTime timestamp;
-
-    public FileRecord(String filePath, String oldHash, String newHash,
-                      FileStatus status, LocalDateTime timestamp) {
-        this.filePath = filePath;
-        this.oldHash = oldHash;
-        this.newHash = newHash;
-        this.status = status;
-        this.timestamp = timestamp;
-    }
-
-    public String getFilePath() {
-        return filePath;
-    }
-
-    public String getOldHash() {
-        return oldHash;
-    }
-
-    public String getNewHash() {
-        return newHash;
-    }
-
-    public FileStatus getStatus() {
-        return status;
-    }
-
-    public LocalDateTime getTimestamp() {
-        return timestamp;
-    }
+public record FileRecord(
+        String filePath,
+        String oldHash,
+        String newHash,
+        FileStatus status,
+        LocalDateTime timestamp
+) {
+    // Compatibility accessors for existing getX() callers
+    public String getFilePath() { return filePath; }
+    public String getOldHash() { return oldHash; }
+    public String getNewHash() { return newHash; }
+    public FileStatus getStatus() { return status; }
+    public LocalDateTime getTimestamp() { return timestamp; }
 
     @Override
     public String toString() {

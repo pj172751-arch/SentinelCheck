@@ -65,6 +65,9 @@ public class IntegrityChecker {
                 }
 
                 String fileName = file.getName();
+                if (fileName.endsWith(".baseline") || fileName.endsWith(".sha256")) {
+                    continue;
+                }
                 String currentHash = hashCalculator.calculateSHA256(file);
 
                 if (baseline.containsKey(fileName)) {

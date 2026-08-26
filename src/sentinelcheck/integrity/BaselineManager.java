@@ -1,10 +1,6 @@
 package sentinelcheck.integrity;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.time.LocalDateTime;
@@ -38,49 +34,34 @@ public class BaselineManager {
             throw new IOException("Not a directory: " + directory.getAbsolutePath());
         }
 
-        Map<String, String> hashes = new LinkedHashMap<>();
         File[] files = directory.listFiles();
-
         if (files == null) {
             throw new IOException("Cannot list files in: " + directory.getAbsolutePath());
         }
 
+        StringBuilder content = new StringBuilder();
+        content.append(COMMENT_PREFIX).append(" SentinelCheck Baseline\n")
+               .append(COMMENT_PREFIX).append(" Created: ").append(LocalDateTime.now().format(TIMESTAMP_FORMAT)).append("\n")
+               .append(COMMENT_PREFIX).append(" Directory: ").append(directory.getAbsolutePath()).append("\n");
+
+        int count = 0;
+        StringBuilder entries = new StringBuilder();
         for (File file : files) {
             if (file.isFile()) {
-                String relativePath = file.getName();
-                // Exclude any temporary or checksum files if needed
-                if (relativePath.endsWith(".baseline") || relativePath.endsWith(".sha256")) {
+                String name = file.getName();
+                if (name.endsWith(".baseline") || name.endsWith(".sha256")) {
                     continue;
                 }
                 String hash = hashCalculator.calculateSHA256(file);
-                hashes.put(relativePath, hash);
+                entries.append(name).append(DELIMITER).append(hash).append("\n");
+                count++;
             }
         }
 
-        // Write baseline with metadata header
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(baselineFile))) {
-            writer.write(COMMENT_PREFIX + " SentinelCheck Baseline");
-            writer.newLine();
-            writer.write(COMMENT_PREFIX + " Created: " +
-                    LocalDateTime.now().format(TIMESTAMP_FORMAT));
-            writer.newLine();
-            writer.write(COMMENT_PREFIX + " Directory: " +
-                    directory.getAbsolutePath());
-            writer.newLine();
-            writer.write(COMMENT_PREFIX + " Files: " + hashes.size());
-            writer.newLine();
-            writer.newLine();
-
-            for (Map.Entry<String, String> entry : hashes.entrySet()) {
-                writer.write(entry.getKey() + DELIMITER + entry.getValue());
-                writer.newLine();
-            }
-        }
-
-        // Write baseline checksum for integrity validation
+        content.append(COMMENT_PREFIX).append(" Files: ").append(count).append("\n\n").append(entries);
+        Files.writeString(baselineFile.toPath(), content.toString());
         writeBaselineChecksum(baselineFile);
-
-        return hashes.size();
+        return count;
     }
 
     /**
@@ -88,26 +69,16 @@ public class BaselineManager {
      */
     public Map<String, String> loadBaseline(File baselineFile) throws IOException {
         Map<String, String> baseline = new LinkedHashMap<>();
-
-        try (BufferedReader reader = new BufferedReader(new FileReader(baselineFile))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-
-                // Skip empty lines and comments
-                if (line.isEmpty() || line.startsWith(COMMENT_PREFIX)) {
-                    continue;
-                }
-
-                int delimiterIndex = line.indexOf(DELIMITER);
-                if (delimiterIndex > 0) {
-                    String filePath = line.substring(0, delimiterIndex).trim();
-                    String hash = line.substring(delimiterIndex + 1).trim();
-                    baseline.put(filePath, hash);
-                }
+        for (String line : Files.readAllLines(baselineFile.toPath())) {
+            line = line.trim();
+            if (line.isEmpty() || line.startsWith(COMMENT_PREFIX)) {
+                continue;
+            }
+            int idx = line.indexOf(DELIMITER);
+            if (idx > 0) {
+                baseline.put(line.substring(0, idx).trim(), line.substring(idx + 1).trim());
             }
         }
-
         return baseline;
     }
 
@@ -115,11 +86,9 @@ public class BaselineManager {
      * Computes the hash of the baseline file and saves it to a sibling .sha256 file.
      */
     public void writeBaselineChecksum(File baselineFile) throws IOException {
-        String baselineHash = hashCalculator.calculateSHA256(baselineFile);
+        String hash = hashCalculator.calculateSHA256(baselineFile);
         File shaFile = new File(baselineFile.getAbsolutePath() + ".sha256");
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(shaFile))) {
-            writer.write(baselineHash);
-        }
+        Files.writeString(shaFile.toPath(), hash);
     }
 
     /**
@@ -127,19 +96,16 @@ public class BaselineManager {
      * Returns true if valid, false if tampered or if checksum is missing.
      */
     public boolean verifyBaselineIntegrity(File baselineFile) {
-        if (!baselineFile.exists()) {
-            return false;
-        }
-
+        if (!baselineFile.exists()) return false;
         File shaFile = new File(baselineFile.getAbsolutePath() + ".sha256");
-        if (!shaFile.exists()) {
-            return false;
-        }
+        if (!shaFile.exists()) return false;
 
         try {
             String currentHash = hashCalculator.calculateSHA256(baselineFile);
-            String expectedHash = new String(Files.readAllBytes(shaFile.toPath())).trim();
-            return currentHash.equalsIgnoreCase(expectedHash);
+            String expectedHash = Files.readString(shaFile.toPath()).trim();
+            byte[] currentBytes = currentHash.toLowerCase().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            byte[] expectedBytes = expectedHash.toLowerCase().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            return java.security.MessageDigest.isEqual(currentBytes, expectedBytes);
         } catch (IOException e) {
             System.err.println("  [ERROR] Failed to verify baseline integrity: " + e.getMessage());
             return false;

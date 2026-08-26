@@ -243,9 +243,7 @@ public class Main {
     private static void runMonitoringMenu(Scanner scanner) {
         boolean back = false;
         while (!back) {
-            System.out.println("\n  +------------------------------------------------------------------+");
-            System.out.println("  |                           MONITORING                             |");
-            System.out.println("  +------------------------------------------------------------------+");
+            printSubmenuBanner("MONITORING");
             System.out.println("  [1] Start Real-Time Monitoring");
             System.out.println("  [2] Stop Monitoring");
             System.out.println("  [3] Verify File Integrity");
@@ -503,9 +501,7 @@ public class Main {
     private static void runSecurityAnalysisMenu(Scanner scanner) {
         boolean back = false;
         while (!back) {
-            System.out.println("\n  +------------------------------------------------------------------+");
-            System.out.println("  |                    SECURITY LOG ANALYSIS                         |");
-            System.out.println("  +------------------------------------------------------------------+");
+            printSubmenuBanner("SECURITY LOG ANALYSIS");
             System.out.println("  [1] Analyze Authentication Logs");
             System.out.println("  [2] Analyze Firewall Logs");
             System.out.println("  [3] Run Complete Security Scan");
@@ -671,9 +667,7 @@ public class Main {
     private static void runIncidentManagementMenu(Scanner scanner) {
         boolean back = false;
         while (!back) {
-            System.out.println("\n  +------------------------------------------------------------------+");
-            System.out.println("  |                     INCIDENT LIFECYCLE                           |");
-            System.out.println("  +------------------------------------------------------------------+");
+            printSubmenuBanner("INCIDENT LIFECYCLE");
             System.out.println("  [1] View Open/Acknowledged Incidents");
             System.out.println("  [2] View All Incidents (inc. Closed)");
             System.out.println("  [3] View Incident Details & Rules");
@@ -689,9 +683,13 @@ public class Main {
             switch (choice) {
                 case "1":
                     listIncidents(false);
+                    System.out.println("\n  Press Enter to continue...");
+                    scanner.nextLine();
                     break;
                 case "2":
                     listIncidents(true);
+                    System.out.println("\n  Press Enter to continue...");
+                    scanner.nextLine();
                     break;
                 case "3":
                     viewIncidentDetails(scanner);
@@ -853,9 +851,7 @@ public class Main {
     private static void runConfigurationMenu(Scanner scanner) {
         boolean back = false;
         while (!back) {
-            System.out.println("\n  +------------------------------------------------------------------+");
-            System.out.println("  |                          CONFIGURATION                           |");
-            System.out.println("  +------------------------------------------------------------------+");
+            printSubmenuBanner("CONFIGURATION");
             System.out.println("  [1] Monitored Protected Directory");
             System.out.println("  [2] Adjust Detection Rule Thresholds");
             System.out.println("  [3] Maintenance Mode");
@@ -917,19 +913,31 @@ public class Main {
             switch (choice) {
                 case "1":
                     System.out.print("  Enter new failed login count threshold: ");
-                    detectionEngine.setAuthThreshold(Integer.parseInt(scanner.nextLine().trim()));
+                    int t1 = Integer.parseInt(scanner.nextLine().trim());
+                    if (t1 <= 0) { System.out.println("  [ERROR] Threshold must be > 0."); break; }
+                    detectionEngine.setAuthThreshold(t1);
+                    System.out.println("  Updated successfully.");
                     break;
                 case "2":
                     System.out.print("  Enter new sliding window size (minutes): ");
-                    detectionEngine.setAuthWindowMinutes(Integer.parseInt(scanner.nextLine().trim()));
+                    int t2 = Integer.parseInt(scanner.nextLine().trim());
+                    if (t2 <= 0) { System.out.println("  [ERROR] Window size must be > 0."); break; }
+                    detectionEngine.setAuthWindowMinutes(t2);
+                    System.out.println("  Updated successfully.");
                     break;
                 case "3":
                     System.out.print("  Enter new multi-account count threshold: ");
-                    detectionEngine.setMultiAccountThreshold(Integer.parseInt(scanner.nextLine().trim()));
+                    int t3 = Integer.parseInt(scanner.nextLine().trim());
+                    if (t3 <= 0) { System.out.println("  [ERROR] Threshold must be > 0."); break; }
+                    detectionEngine.setMultiAccountThreshold(t3);
+                    System.out.println("  Updated successfully.");
                     break;
                 case "4":
                     System.out.print("  Enter new port probing count threshold: ");
-                    detectionEngine.setPortDiversityThreshold(Integer.parseInt(scanner.nextLine().trim()));
+                    int t4 = Integer.parseInt(scanner.nextLine().trim());
+                    if (t4 <= 0) { System.out.println("  [ERROR] Threshold must be > 0."); break; }
+                    detectionEngine.setPortDiversityThreshold(t4);
+                    System.out.println("  Updated successfully.");
                     break;
             }
         } catch (NumberFormatException e) {
@@ -1099,6 +1107,12 @@ public class Main {
         printBorder();
     }
 
+    private static void printSubmenuBanner(String title) {
+        System.out.println("\n  +------------------------------------------------------------------+");
+        printCenteredRow(title);
+        System.out.println("  +------------------------------------------------------------------+");
+    }
+
     private static void printBorder() {
         System.out.println("  +==================================================================+");
     }
@@ -1106,42 +1120,22 @@ public class Main {
     private static void printCenteredRow(String text) {
         String stripped = text.replaceAll("\u001B\\[[;\\d]*m", "");
         int dataWidth = 66;
-        int paddingLeft = (dataWidth - stripped.length()) / 2;
-        int paddingRight = dataWidth - stripped.length() - paddingLeft;
-        
-        System.out.print("  | ");
-        for (int i = 0; i < paddingLeft; i++) {
-            System.out.print(" ");
-        }
-        System.out.print(text);
-        for (int i = 0; i < paddingRight; i++) {
-            System.out.print(" ");
-        }
-        System.out.println(" |");
+        int paddingLeft = Math.max(0, (dataWidth - stripped.length()) / 2);
+        int paddingRight = Math.max(0, dataWidth - stripped.length() - paddingLeft);
+        System.out.println("  | " + " ".repeat(paddingLeft) + text + " ".repeat(paddingRight) + " |");
     }
 
     private static void printRow(String content) {
         String stripped = content.replaceAll("\u001B\\[[;\\d]*m", "");
-        int dataWidth = 66;
-        int padding = dataWidth - stripped.length();
-        System.out.print("  | " + content);
-        for (int i = 0; i < padding; i++) {
-            System.out.print(" ");
-        }
-        System.out.println(" |");
+        int padding = Math.max(0, 66 - stripped.length());
+        System.out.println("  | " + content + " ".repeat(padding) + " |");
     }
 
     private static void printFieldRow(String label, String value) {
         String strippedLabel = label.replaceAll("\u001B\\[[;\\d]*m", "");
         String strippedValue = value.replaceAll("\u001B\\[[;\\d]*m", "");
-        int dataWidth = 66;
-        int padding = dataWidth - strippedLabel.length() - strippedValue.length();
-        
-        System.out.print("  | " + label + value);
-        for (int i = 0; i < padding; i++) {
-            System.out.print(" ");
-        }
-        System.out.println(" |");
+        int padding = Math.max(0, 66 - strippedLabel.length() - strippedValue.length());
+        System.out.println("  | " + label + value + " ".repeat(padding) + " |");
     }
 
     // ─── Non-interactive Scan (Batch execution pipeline) ──────────
