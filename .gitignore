@@ -32,3 +32,6 @@ desktop.ini
 
 # Local state database
 data/
+
+# Local developer scripts
+*.bat

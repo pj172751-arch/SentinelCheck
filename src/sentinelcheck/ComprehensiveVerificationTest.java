@@ -45,6 +45,7 @@ public class ComprehensiveVerificationTest {
         testMaintenanceMode();
         testIncidentReportGenerator();
         testSecurityHardeningAndResilience();
+        testAttackSimulator();
 
         System.out.println("\n=================================================");
         System.out.printf("   TEST SUMMARY: %d PASSED, %d FAILED%n", testsPassed, testsFailed);
@@ -431,6 +432,59 @@ public class ComprehensiveVerificationTest {
             Files.deleteIfExists(tempSha);
         } catch (Exception e) {
             assertTrue("Security hardening test threw exception: " + e.getMessage(), false);
+        }
+    }
+
+    private static void testAttackSimulator() {
+        System.out.println("\n--- [12/12] Testing AttackSimulator Engine ---");
+        try {
+            RiskScorer scorer = new RiskScorer();
+            IncidentManager manager = new IncidentManager(scorer);
+            DetectionEngine engine = new DetectionEngine(scorer);
+            EventHistory history = new EventHistory();
+            history.clear();
+            manager.clear();
+
+            engine.setEventHistory(history);
+            engine.setIncidentManager(manager);
+
+            sentinelcheck.simulation.AttackSimulator simulator =
+                    new sentinelcheck.simulation.AttackSimulator(engine, manager, history);
+
+            // Run simulation stages
+            simulator.simulatePortProbing("192.168.1.250");
+            simulator.simulateBruteForce("192.168.1.250");
+            simulator.simulateSuspiciousSuccess("192.168.1.250");
+            simulator.simulateFileTampering();
+
+            List<Incident> incidents = manager.getIncidents();
+            assertTrue("Attack simulation generated active incidents", incidents.size() >= 2);
+
+            boolean hasFwRule = false, hasAuth1 = false, hasAuth2 = false, hasAuth3 = false, hasCorr = false, hasFileMod = false, hasFileTamper = false;
+            for (Incident inc : incidents) {
+                for (Alert a : inc.getAlerts()) {
+                    if (a.getRuleId().equals("FW-001")) hasFwRule = true;
+                    if (a.getRuleId().equals("AUTH-001")) hasAuth1 = true;
+                    if (a.getRuleId().equals("AUTH-002")) hasAuth2 = true;
+                    if (a.getRuleId().equals("AUTH-003")) hasAuth3 = true;
+                    if (a.getRuleId().equals("CORR-001")) hasCorr = true;
+                    if (a.getRuleId().equals("FILE-001")) hasFileMod = true;
+                    if (a.getRuleId().equals("FILE-004")) hasFileTamper = true;
+                }
+            }
+
+            assertTrue("Simulator triggered FW-001", hasFwRule);
+            assertTrue("Simulator triggered AUTH-001", hasAuth1);
+            assertTrue("Simulator triggered AUTH-002", hasAuth2);
+            assertTrue("Simulator triggered AUTH-003", hasAuth3);
+            assertTrue("Simulator triggered CORR-001", hasCorr);
+            assertTrue("Simulator triggered FILE-001", hasFileMod);
+            assertTrue("Simulator triggered FILE-004", hasFileTamper);
+
+            history.clear();
+            manager.clear();
+        } catch (Exception e) {
+            assertTrue("AttackSimulator test threw exception: " + e.getMessage(), false);
         }
     }
 }

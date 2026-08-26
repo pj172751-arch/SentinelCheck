@@ -20,6 +20,7 @@ import sentinelcheck.model.IncidentStatus;
 import sentinelcheck.model.SecurityEvent;
 import sentinelcheck.model.Severity;
 import sentinelcheck.report.IncidentReportGenerator;
+import sentinelcheck.simulation.AttackSimulator;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -81,10 +82,17 @@ public class Main {
         List<Alert> reloadedAlerts = detectionEngine.processAllEvents(eventHistory.getEvents());
         incidentManager.loadIncidents(reloadedAlerts);
 
-        // 3. Verify Baseline Integrity on start
+        // 3. Check for standalone simulation/demo flags
+        if (args.length > 0 && (args[0].equals("--simulate") || args[0].equals("--demo"))) {
+            AttackSimulator simulator = new AttackSimulator(detectionEngine, incidentManager, eventHistory);
+            simulator.runFullKillChainSimulation();
+            return;
+        }
+
+        // 4. Verify Baseline Integrity on start
         checkBaselineIntegrityOnStartup();
 
-        // 4. Check for command-line arguments (Batch non-interactive scan)
+        // 5. Check for command-line arguments (Batch non-interactive scan)
         if (args.length > 0 && args[0].equals("--scan")) {
             for (int i = 1; i < args.length; i++) {
                 if (args[i].equals("--dir") && i + 1 < args.length) {
@@ -161,6 +169,9 @@ public class Main {
                     runConfigurationMenu(scanner);
                     break;
                 case "5":
+                    runAttackSimulatorMenu(scanner);
+                    break;
+                case "6":
                     viewSystemStatus();
                     System.out.println("\n  Press Enter to continue...");
                     scanner.nextLine();
@@ -232,7 +243,8 @@ public class Main {
         System.out.println("  [2] Security Analysis");
         System.out.println("  [3] Incident Management");
         System.out.println("  [4] Configuration");
-        System.out.println("  [5] System Status");
+        System.out.println("  [5] Interactive Attack Simulator");
+        System.out.println("  [6] System Status");
         System.out.println("  [0] Exit");
         printBorder();
         System.out.println();
@@ -1015,7 +1027,65 @@ public class Main {
         }
     }
 
-    // ─── Submenu 5: System Status Dashboard ────────────────────────
+    // ─── Submenu 5: Attack Simulator ──────────────────────────────
+
+    private static void runAttackSimulatorMenu(Scanner scanner) {
+        boolean back = false;
+        AttackSimulator simulator = new AttackSimulator(detectionEngine, incidentManager, eventHistory);
+        while (!back) {
+            printSubmenuBanner("INTERACTIVE ATTACK SIMULATOR");
+            System.out.println("  [1] Run Full Cyber Kill Chain Demo (End-to-End)");
+            System.out.println("  [2] Simulate Adversary Port Probing (FW-001)");
+            System.out.println("  [3] Simulate Credential Spray & Brute Force (AUTH-001/003)");
+            System.out.println("  [4] Simulate Compromise & Cross-Module Correlation (AUTH-002/CORR-001)");
+            System.out.println("  [5] Simulate Baseline Tampering & File Alteration (FILE-001/004)");
+            System.out.println("  [6] Flush Simulated Incidents / Reset State");
+            System.out.println("  [0] Back");
+            System.out.println("  +------------------------------------------------------------------+");
+            System.out.print("  Select option: ");
+            String choice = scanner.nextLine().trim();
+
+            switch (choice) {
+                case "1":
+                    simulator.runFullKillChainSimulation();
+                    System.out.println("\n  Press Enter to continue...");
+                    scanner.nextLine();
+                    break;
+                case "2":
+                    simulator.simulatePortProbing("192.168.1.250");
+                    System.out.println("\n  Press Enter to continue...");
+                    scanner.nextLine();
+                    break;
+                case "3":
+                    simulator.simulateBruteForce("192.168.1.250");
+                    System.out.println("\n  Press Enter to continue...");
+                    scanner.nextLine();
+                    break;
+                case "4":
+                    simulator.simulateSuspiciousSuccess("192.168.1.250");
+                    System.out.println("\n  Press Enter to continue...");
+                    scanner.nextLine();
+                    break;
+                case "5":
+                    simulator.simulateFileTampering();
+                    System.out.println("\n  Press Enter to continue...");
+                    scanner.nextLine();
+                    break;
+                case "6":
+                    eventHistory.clear();
+                    incidentManager.clear();
+                    System.out.println("\n  [SUCCESS] Simulation state flushed and reset.");
+                    break;
+                case "0":
+                    back = true;
+                    break;
+                default:
+                    System.out.println("\n  Invalid option. Please try again.");
+            }
+        }
+    }
+
+    // ─── Submenu 6: System Status Dashboard ────────────────────────
 
     private static void viewSystemStatus() {
         // Gathering dashboard details
